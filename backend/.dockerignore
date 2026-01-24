@@ -1,0 +1,13 @@
+# Ignore files for Docker build
+node_modules
+npm-debug.log
+.git
+.gitignore
+README.md
+.nyc_output
+coverage
+.nyc_output
+.coverage
+.pytest_cache
+.DS_Store
+*.log

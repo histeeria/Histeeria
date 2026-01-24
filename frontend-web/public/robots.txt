@@ -1,0 +1,9 @@
+# Upvista Community - Robots.txt
+# Allow all crawlers
+
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://upvista-community.vercel.app/sitemap.xml
+

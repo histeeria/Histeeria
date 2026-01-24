@@ -1,0 +1,210 @@
+# Histeeria Backend - Render.com Deployment Configuration
+# Optimized for cost-effective production deployment
+#
+# DEPLOYMENT INSTRUCTIONS:
+# 1. Push to GitHub/GitLab
+# 2. Connect repo to Render.com
+# 3. Create a new Web Service using this blueprint
+# 4. Add sensitive env vars in Render dashboard (marked sync: false)
+# 5. Deploy!
+#
+# COST: Free tier (0.5 CPU, 512MB RAM) - sufficient for ~10K users
+
+services:
+  - type: web
+    name: histeeria-backend
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free  # Upgrade to starter ($7/month) for production
+    region: oregon  # Change to closest region (oregon, ohio, frankfurt, singapore)
+    branch: main
+    rootDir: backend
+
+    # Health check for auto-restart on failure
+    healthCheckPath: /health
+
+    # Auto-deploy on push to main branch
+    autoDeploy: true
+
+    # Build configuration
+    buildCommand: ""  # Docker handles build
+    
+    # Number of instances (free tier: 1)
+    numInstances: 1
+
+    # Environment variables
+    envVars:
+      # ============================================
+      # SERVER CONFIGURATION
+      # ============================================
+      - key: GIN_MODE
+        value: release
+      
+      - key: PORT
+        value: 10000  # Render requires port 10000
+
+      # ============================================
+      # DATABASE (Supabase)
+      # ============================================
+      - key: SUPABASE_URL
+        sync: false  # Add in Render dashboard
+      
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+
+      # ============================================
+      # AUTHENTICATION
+      # ============================================
+      - key: JWT_SECRET
+        generateValue: true  # Render auto-generates secure value
+      
+      - key: JWT_EXPIRY
+        value: "720h"  # 30 days
+
+      # ============================================
+      # EMAIL (SMTP)
+      # ============================================
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      
+      - key: SMTP_PORT
+        value: "587"
+      
+      - key: SMTP_USERNAME
+        sync: false
+      
+      - key: SMTP_PASSWORD
+        sync: false
+      
+      - key: SMTP_FROM_NAME
+        value: Histeeria
+      
+      - key: SMTP_FROM_EMAIL
+        sync: false
+
+      # ============================================
+      # CORS & FRONTEND
+      # ============================================
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://histeeria.app,https://www.histeeria.app
+      
+      - key: FRONTEND_URL
+        value: https://histeeria.app
+
+      # ============================================
+      # REDIS (Upstash - Serverless)
+      # Upstash free tier: 10K commands/day
+      # ============================================
+      - key: REDIS_HOST
+        sync: false  # e.g., xxx.upstash.io
+      
+      - key: REDIS_PORT
+        value: "6379"
+      
+      - key: REDIS_PASSWORD
+        sync: false
+      
+      - key: REDIS_DB
+        value: "0"
+
+      # ============================================
+      # CLOUDFLARE R2 STORAGE
+      # R2 free tier: 10GB storage, 0 egress fees!
+      # ============================================
+      - key: R2_ACCOUNT_ID
+        sync: false
+      
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      
+      - key: R2_BUCKET_NAME
+        value: histeeria-media
+      
+      - key: R2_PUBLIC_URL
+        sync: false  # e.g., https://media.histeeria.app or bucket.r2.dev
+
+      # ============================================
+      # OAUTH PROVIDERS (Optional)
+      # ============================================
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      
+      - key: GOOGLE_REDIRECT_URL
+        value: https://histeeria.app/auth/google/callback
+
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+      
+      - key: GITHUB_REDIRECT_URL
+        value: https://histeeria.app/auth/github/callback
+
+      - key: LINKEDIN_CLIENT_ID
+        sync: false
+      
+      - key: LINKEDIN_CLIENT_SECRET
+        sync: false
+      
+      - key: LINKEDIN_REDIRECT_URL
+        value: https://histeeria.app/auth/linkedin/callback
+
+      # ============================================
+      # RATE LIMITING
+      # ============================================
+      - key: RATE_LIMIT_LOGIN
+        value: "5"
+      
+      - key: RATE_LIMIT_REGISTER
+        value: "3"
+      
+      - key: RATE_LIMIT_RESET
+        value: "3"
+      
+      - key: RATE_LIMIT_WINDOW
+        value: "1m"
+      
+      - key: RATE_LIMIT_FORGIVENESS
+        value: "2"
+
+      # ============================================
+      # STORAGE (Supabase - fallback)
+      # ============================================
+      - key: STORAGE_BUCKET_NAME
+        value: profile-pictures
+      
+      - key: STORAGE_MAX_FILE_SIZE
+        value: "5242880"  # 5MB
+
+# ============================================
+# SCALING NOTES
+# ============================================
+# 
+# For 5K-10K users (Free/Starter):
+#   - 1 instance
+#   - Upstash Redis (free tier)
+#   - R2 for media (free tier)
+#   - Cost: $0-7/month
+#
+# For 10K-50K users (Pro):
+#   - 2-3 instances
+#   - Upstash Redis (pay-as-you-go)
+#   - R2 for media
+#   - Cost: $25-50/month
+#
+# For 50K+ users (Pro + scaling):
+#   - 3-5 instances with auto-scaling
+#   - Managed Redis
+#   - CDN in front of R2
+#   - Cost: $100-200/month

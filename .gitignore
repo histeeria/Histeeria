@@ -1,0 +1,184 @@
+# Histeeria Comprehensive Gitignore
+
+# Secrets and Environment Variables
+.env
+.env.*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.staging.local
+!.env.example
+!.env.sample
+!.env.template
+
+# API Keys and Secrets
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+secrets/
+config/secrets/
+config/keys/
+
+# Database and Storage
+*.db
+*.sqlite
+*.sqlite3
+data/
+storage/
+uploads/
+
+# Authentication and Tokens
+auth/
+tokens/
+jwt/
+oauth/
+
+# Backend (Go) Exclusions
+# Binaries and compiled files
+backend/main
+backend/*.exe
+backend/upvista-backend*
+backend/bin/
+backend/dist/
+# Dependencies and Tooling
+backend/vendor/
+backend/pkg/mod/
+backend/coverage.txt
+backend/profile.out
+# Logs
+backend/*.log
+
+# Frontend Web (Next.js) Exclusions
+# Dependencies
+frontend-web/node_modules/
+# Build artifacts
+frontend-web/.next/
+frontend-web/out/
+frontend-web/build/
+frontend-web/.vercel/
+# Local env files (handled by global pattern but added for clarity)
+frontend-web/.env.local
+frontend-web/.env.development.local
+frontend-web/.env.test.local
+frontend-web/.env.production.local
+# Tooling
+frontend-web/.eslintcache
+frontend-web/coverage/
+frontend-web/npm-debug.log*
+frontend-web/yarn-debug.log*
+frontend-web/yarn-error.log*
+
+# Mobile App (Flutter/Dart) Exclusions
+# Tooling
+mobile-app/.dart_tool/
+mobile-app/.flutter-plugins
+mobile-app/.flutter-plugins-dependencies
+mobile-app/.packages
+mobile-app/.pub-cache/
+mobile-app/.pub/
+# Build artifacts
+mobile-app/build/
+mobile-app/ios/Flutter/Generated.xcconfig
+mobile-app/ios/Flutter/flutter_export_environment.sh
+mobile-app/ios/Flutter/App.framework
+mobile-app/ios/Flutter/Flutter.framework
+mobile-app/android/app/src/main/res/values/strings.xml (if customized for local only)
+
+# Common IDE/Editor Exclusions
+.vscode/
+.idea/
+*.swp
+*.swo
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.bak
+*.tmp
+*.temp
+
+# OS Specific Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Logs and Temporary files
+logs/
+*.log
+*.log.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+tmp/
+temp/
+.cache/
+
+# Security and Sensitive Files
+# Private keys and certificates
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+id_rsa
+id_dsa
+id_ecdsa
+id_ed25519
+
+# Database files and dumps
+*.db
+*.sqlite
+*.sqlite3
+*.sql.gz
+*.sql.bz2
+dumps/
+backups/
+
+# Configuration files with sensitive data
+config/production.json
+config/production.yaml
+config/production.yml
+config/staging.json
+config/staging.yaml
+config/staging.yml
+config/database.json
+config/database.yaml
+config/database.yml
+
+# Third-party API keys and secrets
+stripe/
+payment/
+webhooks/
+
+# Docker secrets and volumes
+docker/secrets/
+.docker/
+
+# Kubernetes and deployment secrets
+k8s/secrets/
+deployment/secrets/
+
+# Monitoring and analytics keys
+analytics/
+tracking/
+
+# Firebase and other service configs
+firebase/
+firebase.json (if contains sensitive data)
+google-services.json
+GoogleService-Info.plist
+
+# Platform-specific secrets
+ios/Runner/GoogleService-Info.plist
+android/app/google-services.json
+android/app/src/main/res/values/secrets.xml
