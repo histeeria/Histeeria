@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Histeeria | Privacy-First, High-Performance Social Platform</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+
+<body>
+    <!-- Premium Header -->
+    <header class="header" id="header">
+        <div class="container header-container">
+            <a href="#" class="logo">
+                <img src="assets/u.png" alt="Histeeria Logo" class="brand-logo">
+                <span class="logo-text">Histeeria</span>
+            </a>
+            <nav class="nav">
+                <ul class="nav-list">
+                    <li><a href="#vision">Vision</a></li>
+                    <li><a href="#architecture">Architecture</a></li>
+                    <li><a href="#security">Security</a></li>
+                    <li><a href="#features">Features</a></li>
+                </ul>
+            </nav>
+            <div class="header-actions">
+                <a href="#" class="btn btn-premium-glow btn-sm desktop-only">Launch Web App</a>
+                <button class="menu-toggle" id="menu-toggle">
+                    <i data-lucide="menu"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Mobile Nav Overlay -->
+    <div class="mobile-nav" id="mobile-nav">
+        <div class="mobile-nav-header">
+            <div class="logo">
+                <img src="assets/u.png" alt="Histeeria Logo" class="brand-logo">
+                <span class="logo-text">Histeeria</span>
+            </div>
+            <button class="close-toggle" id="close-toggle">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+        <ul class="mobile-nav-list">
+            <li><a href="#vision">Vision</a></li>
+            <li><a href="#architecture">Architecture</a></li>
+            <li><a href="#security">Security</a></li>
+            <li><a href="#features">Features</a></li>
+            <li class="mobile-cta-item"><a href="#" class="btn btn-premium-glow">Launch Web App</a></li>
+        </ul>
+    </div>
+
+    <main>
+        <!-- Intense Hero Section -->
+        <section class="hero">
+            <div class="hero-bg-glow"></div>
+            <div class="container hero-container">
+                <div class="hero-content">
+                    <div class="hero-badge reveal">Version 1.0 Production Ready</div>
+                    <h1 class="hero-title reveal">
+                        Social Energy <br>
+                        <span class="gradient-text">Redefined.</span>
+                    </h1>
+                    <p class="hero-subtitle reveal">A privacy-first, enterprise-grade social networking ecosystem.
+                        Engineered for massive scale, secured by end-to-end encryption. Your data, your sovereignty.</p>
+                    <div class="hero-ctas reveal">
+                        <a href="#platforms" class="btn btn-premium-glow btn-lg">Get Started</a>
+                        <a href="#architecture" class="btn btn-secondary-glass btn-lg">Explore Core</a>
+                    </div>
+                    <div class="hero-stats reveal">
+                        <div class="stat-item">
+                            <div class="stat-value-group">
+                                <span class="stat-value" data-target="25000">0</span>
+                            </div>
+                            <span class="stat-label">Req/sec</span>
+                        </div>
+                        <div class="stat-divider"></div>
+                        <div class="stat-item">
+                            <div class="stat-value-group">
+                                <span class="stat-value" data-target="100">0</span>
+                                <span class="stat-unit">ms</span>
+                            </div>
+                            <span class="stat-label">Latency</span>
+                        </div>
+                        <div class="stat-divider"></div>
+                        <div class="stat-item">
+                            <span class="stat-value">E2EE</span>
+                            <span class="stat-label">By Default</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="hero-visual reveal">
+                    <div class="iphone-mockup hero-iphone">
+                        <div class="iphone-frame">
+                            <div class="iphone-screen">
+                                <img src="assets/welcome-screen.jpeg" alt="Histeeria Mobile">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Vision Section -->
+        <section id="vision" class="section vision">
+            <div class="container">
+                <div class="vision-grid">
+                    <div class="vision-content reveal">
+                        <h2 class="section-title">The Privacy Revolution</h2>
+                        <p class="section-desc">Histeeria was built as an antidote to the surveillance engine of modern
+                            social media. We prove that a high-performance, feature-rich social ecosystem doesn't have
+                            to compromise user privacy.</p>
+                        <div class="vision-points">
+                            <div class="vision-item">
+                                <div class="vision-icon"><i data-lucide="shield-check"></i></div>
+                                <div class="vision-text">
+                                    <h3>Zero-Knowledge Architecture</h3>
+                                    <p>Your private data is never visible to Histeeria servers. Decryption keys stay
+                                        exclusively on your hardware.</p>
+                                </div>
+                            </div>
+                            <div class="vision-item">
+                                <div class="vision-icon"><i data-lucide="database-zap"></i></div>
+                                <div class="vision-text">
+                                    <h3>Data Sovereignty</h3>
+                                    <p>Full control over your digital footprint. Export your data, monitor your
+                                        sessions, and own your relationships.</p>
+                                </div>
+                            </div>
+                            <div class="vision-item">
+                                <div class="vision-icon"><i data-lucide="server"></i></div>
+                                <div class="vision-text">
+                                    <h3>Production-Grade Scale</h3>
+                                    <p>Massively scalable infrastructure designed to serve millions while maintaining
+                                        sub-100ms response times globally.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="vision-visual reveal">
+                        <div class="iphone-mockup">
+                            <div class="iphone-frame">
+                                <div class="iphone-screen">
+                                    <img src="assets/profile.jpeg" alt="User Sovereignty">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Architecture Deep Dive -->
+        <section id="architecture" class="section architecture">
+            <div class="container">
+                <div class="section-header reveal">
+                    <h2 class="section-title text-center">Engineered for Scale</h2>
+                    <p class="section-subtitle text-center">A high-performance modular monolith architecture built on
+                        the most robust technologies in the industry.</p>
+                </div>
+                <div class="architecture-grid">
+                    <div class="tech-card reveal">
+                        <div class="tech-header">
+                            <div class="tech-icon"><i data-lucide="code-2"></i></div>
+                            <h3>Go 1.24 Backend</h3>
+                        </div>
+                        <p>Our backend is built with Go, specifically leveraging its lightweight goroutines and channels
+                            to handle <strong>25,000+ concurrent requests</strong> per second. The modular architecture
+                            ensures maintainability and scalability.</p>
+                    </div>
+                    <div class="tech-card reveal">
+                        <div class="tech-header">
+                            <div class="tech-icon"><i data-lucide="database"></i></div>
+                            <h3>Supabase & PostgreSQL</h3>
+                        </div>
+                        <p>ACID-compliant storage using PostgreSQL. We implement <strong>Row-Level Security
+                                (RLS)</strong> policies to ensure users can only ever access their own data at the
+                            database level, adding a critical layer of security.</p>
+                    </div>
+                    <div class="tech-card reveal">
+                        <div class="tech-header">
+                            <div class="tech-icon"><i data-lucide="zap"></i></div>
+                            <h3>Redis Pub/Sub</h3>
+                        </div>
+                        <p>Real-time messaging is coordinated via Redis Streams and Pub/Sub, allowing multiple backend
+                            instances to communicate instantly. Sub-millisecond latency for feed updates and typing
+                            indicators.</p>
+                    </div>
+                    <div class="tech-card reveal">
+                        <div class="tech-header">
+                            <div class="tech-icon"><i data-lucide="layers"></i></div>
+                            <h3>Next.js 16 Edge</h3>
+                        </div>
+                        <p>Our web platform uses Next.js 16 with React 19, deployed on a global edge network. This
+                            ensures sub-2s initial load times and exceptional SEO through server-side rendering and
+                            static generation.</p>
+                    </div>
+                    <div class="tech-card reveal">
+                        <div class="tech-header">
+                            <div class="tech-icon"><i data-lucide="smartphone"></i></div>
+                            <h3>Flutter Core</h3>
+                        </div>
+                        <p>A single Dart codebase powers our iOS, Android, and Desktop apps. Flutter's engine provides
+                            native performance while its widget system enables our signature glassmorphism/neon
+                            aesthetic.</p>
+                    </div>
+                    <div class="tech-card reveal">
+                        <div class="tech-header">
+                            <div class="tech-icon"><i data-lucide="shield-alert"></i></div>
+                            <h3>Hybrid Cryptography</h3>
+                        </div>
+                        <p>We combine <strong>RSA-4096</strong> for identity verification and
+                            <strong>AES-256-GCM</strong> for message content. This hybrid approach offers both the
+                            security of asymmetric encryption and the speed of symmetric ciphers.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Security & Proof Section -->
+        <section id="security" class="section security">
+            <div class="container">
+                <div class="security-intro reveal">
+                    <h2 class="section-title text-center">Uncompromising Security</h2>
+                    <p class="section-subtitle text-center">We don't just claim privacy; we prove it at the database
+                        level. Click the images to inspect the E2EE evidence.</p>
+                </div>
+
+                <div class="security-proof reveal">
+                    <div class="proof-card">
+                        <div class="proof-header">
+                            <i data-lucide="lock"></i>
+                            <h3>End-to-End Encryption in Action</h3>
+                        </div>
+                        <div class="proof-content">
+                            <div class="proof-text">
+                                <p>On Histeeria, private message content never reaches our database in plain text. As
+                                    shown in these Supabase dashboard screenshots, all message payloads are
+                                    cryptographically protected using a user-owned key.</p>
+                                <ul class="security-bullets">
+                                    <li><strong>RSA-AES Hybrid:</strong> Keys generated locally, never uploaded.</li>
+                                    <li><strong>Zero-Access:</strong> Not even our database administrators can read your
+                                        messages.</li>
+                                    <li><strong>Forward Secrecy:</strong> Each conversation uses unique keys.</li>
+                                </ul>
+                            </div>
+                            <div class="proof-screens">
+                                <div class="proof-frame preview-trigger" data-img="assets/db-ss1.png">
+                                    <div class="frame-overlay"><i data-lucide="zoom-in"></i></div>
+                                    <img src="assets/db-ss1.png" alt="Supabase E2EE Proof 1">
+                                    <span class="proof-caption">Encrypted fields in Supabase</span>
+                                </div>
+                                <div class="proof-frame preview-trigger" data-img="assets/db-ss2.png">
+                                    <div class="frame-overlay"><i data-lucide="zoom-in"></i></div>
+                                    <img src="assets/db-ss2.png" alt="Supabase E2EE Proof 2">
+                                    <span class="proof-caption">Database level encryption tracking</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="architecture-expand reveal">
+                    <h3>Modular Monolith Architecture</h3>
+                    <p>Designed for simplicity and extreme performance, our modular monolith approach allows each
+                        component (Auth, Messaging, Feed, Social) to operate independently within a unified system. This
+                        architecture minimizes network RTT between services, leading to our market-leading sub-100ms API
+                        response times.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Feature Grid Section -->
+        <section id="features" class="section features">
+            <div class="container">
+                <div class="section-header reveal">
+                    <h2 class="section-title text-center">The Histeeria Ecosystem</h2>
+                    <p class="section-subtitle text-center">Everything you need for modern social interaction, with none
+                        of the surveillance.</p>
+                </div>
+                <div class="feature-showcase">
+                    <div class="feature-nav reveal">
+                        <button class="feat-btn active" data-target="messaging">Messaging</button>
+                        <button class="feat-btn" data-target="content">Content</button>
+                        <button class="feat-btn" data-target="social">Social</button>
+                    </div>
+                    <div class="feature-display reveal">
+                        <div class="feat-pane active" id="messaging">
+                            <div class="feat-info">
+                                <div class="feat-icon-label"><i data-lucide="message-square"></i> Messaging</div>
+                                <h3>Secure Real-Time Chat</h3>
+                                <p>Experience WhatsApp-grade messaging with full E2EE. Features include delivered/read
+                                    receipts, typing indicators, emoji reactions, and message editing.</p>
+                            </div>
+                            <div class="feat-visual">
+                                <div class="iphone-mockup">
+                                    <div class="iphone-frame">
+                                        <div class="iphone-screen">
+                                            <img src="assets/signup.jpeg" alt="Messaging UI">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="feat-pane" id="content">
+                            <div class="feat-info">
+                                <div class="feat-icon-label"><i data-lucide="send"></i> Feed</div>
+                                <h3>Articles & Ephemeral Content</h3>
+                                <p>Publish long-form articles with a rich text editor or share 24-hour statuses. Our
+                                    feed algorithm is chronological and engagement-weighted, never manipulated for
+                                    advertiser profit.</p>
+                            </div>
+                            <div class="feat-visual">
+                                <div class="iphone-mockup">
+                                    <div class="iphone-frame">
+                                        <div class="iphone-screen">
+                                            <img src="assets/feed.jpeg" alt="Content UI">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="feat-pane" id="social">
+                            <div class="feat-info">
+                                <div class="feat-icon-label"><i data-lucide="users"></i> Community</div>
+                                <h3>Advanced Social Graph</h3>
+                                <p>A sophisticated asymmetric follow system with deep privacy controls. Block, restrict,
+                                    or hide content with granular precision. Intelligent discovery without behavioral
+                                    tracking.</p>
+                            </div>
+                            <div class="feat-visual">
+                                <div class="iphone-mockup">
+                                    <div class="iphone-frame">
+                                        <div class="iphone-screen">
+                                            <img src="assets/profile.jpeg" alt="Social UI">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CTA Section -->
+        <section id="platforms" class="section platforms-cta">
+            <div class="container">
+                <div class="cta-card-premium reveal">
+                    <div class="cta-content">
+                        <h2 class="section-title">Step into the <span class="gradient-text">Future.</span></h2>
+                        <p class="section-desc">Join the privacy-first revolution today. Histeeria is available on your
+                            favorite platforms.</p>
+                        <div class="platform-badges">
+                            <a href="#" class="store-link">
+                                <img src="assets/app-store.png" alt="Download on App Store">
+                            </a>
+                            <a href="#" class="store-link">
+                                <img src="assets/google-play.png" alt="Get it on Google Play">
+                            </a>
+                        </div>
+                        <div class="cta-web-option">
+                            <span>Or start instantly in your browser</span>
+                            <a href="#" class="btn btn-premium-glow btn-lg">Launch Web App</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Professional Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-top">
+                <div class="footer-brand">
+                    <div class="logo">
+                        <img src="assets/u.png" alt="Histeeria Logo" class="brand-logo">
+                        <span class="logo-text">Histeeria</span>
+                    </div>
+                    <p>A production-ready social networking platform built with conviction that privacy and features are
+                        not mutually exclusive.</p>
+                    <div class="footer-download">
+                        <img src="assets/download.png" alt="Download Rewards" class="download-badge">
+                    </div>
+                </div>
+                <div class="footer-links-grid">
+                    <div class="footer-group">
+                        <h4>Platform</h4>
+                        <ul class="footer-list">
+                            <li><a href="#">Web App</a></li>
+                            <li><a href="#">Mobile Apps</a></li>
+                            <li><a href="#">System Status</a></li>
+                        </ul>
+                    </div>
+                    <div class="footer-group">
+                        <h4>Resources</h4>
+                        <ul class="footer-list">
+                            <li><a href="#">Documentation</a></li>
+                            <li><a href="#">Open Source Philosophy</a></li>
+                            <li><a href="#">Security Audit</a></li>
+                            <li><a href="#">Architecture Whitepaper</a></li>
+                        </ul>
+                    </div>
+                    <div class="footer-group">
+                        <h4>Legal</h4>
+                        <ul class="footer-list">
+                            <li><a href="#">Terms of Service</a></li>
+                            <li><a href="#">Privacy Policy</a></li>
+                            <li><a href="#">GDPR Compliance</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <div class="footer-copyright">
+                    <p>&copy; 2026 Histeeria. Created by Hamza Hafeez. All rights reserved.</p>
+                </div>
+                <div class="footer-tagline">
+                    <span>Engineering Philosophy: Zero Knowledge, Maximum Performance.</span>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Image Preview Modal -->
+    <div id="image-modal" class="modal">
+        <span class="modal-close">&times;</span>
+        <img class="modal-content" id="modal-img">
+        <div id="modal-caption"></div>
+    </div>
+
+    <script src="script.js"></script>
+    <script>
+        // Initialize dynamic icons
+        lucide.createIcons();
+    </script>
+</body>
+
+</html>
