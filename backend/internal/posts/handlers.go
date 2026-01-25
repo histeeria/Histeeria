@@ -445,13 +445,41 @@ func (h *Handlers) UnrestrictPost(c *gin.Context) {
 
 // GetUserPosts handles GET /api/v1/posts/user/:username
 func (h *Handlers) GetUserPosts(c *gin.Context) {
-	// TODO: Convert username to user ID
-	// For now, return empty
+	username := c.Param("username")
+	fmt.Printf("[GetUserPosts] Request for username: %s\n", username)
+	if username == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Username is required"})
+		return
+	}
+
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+
+	// Get viewer ID (optional)
+	var viewerID uuid.UUID
+	if val, exists := c.Get("user_id"); exists {
+		viewerID, _ = uuid.Parse(val.(string))
+		fmt.Printf("[GetUserPosts] Viewer ID: %s\n", viewerID)
+	} else {
+		fmt.Println("[GetUserPosts] No viewer ID (public request)")
+	}
+
+	posts, total, err := h.service.GetUserPostsByUsername(c.Request.Context(), username, limit, offset, viewerID)
+	if err != nil {
+		fmt.Printf("[GetUserPosts] Error: %v\n", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	fmt.Printf("[GetUserPosts] Returning %d posts (total: %d) for %s\n", len(posts), total, username)
 
 	c.JSON(http.StatusOK, models.PostsResponse{
 		Success: true,
-		Posts:   []models.Post{},
-		Total:   0,
+		Posts:   posts,
+		Total:   total,
+		Page:    offset / limit,
+		Limit:   limit,
+		HasMore: offset+limit < total,
 	})
 }
 

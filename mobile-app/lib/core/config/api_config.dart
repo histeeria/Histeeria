@@ -42,23 +42,21 @@ class ApiConfig {
       return envBaseUrl;
     }
     
-    // TEMPORARY FIX: Hardcode WiFi IP for testing
-    // Replace 192.168.100.187 with your actual laptop IP if different
-    // Find IP: ip addr show | grep "inet " | grep -v "127.0.0.1"
+    // Use WiFi IP for physical devices - Highest accuracy for current user
     const wifiIp = '192.168.100.187';
     const wifiBaseUrl = 'http://$wifiIp:8081/api/v1';
+
+    if (Platform.isAndroid && !kIsWeb) {
+      // Return WiFi IP for Android physical device/emulator by default
+      return wifiBaseUrl;
+    }
     
-    // Use platform-specific defaults (Android emulator: 10.0.2.2, iOS: localhost)
+    // Use platform-specific defaults
     final platformDefault = NetworkConfigService.getPlatformDefaultBaseUrl();
     if (platformDefault != null) {
-      // If Android emulator, try WiFi IP first (more reliable)
-      if (Platform.isAndroid && !kIsWeb) {
-        return wifiBaseUrl;
-      }
       return platformDefault;
     }
     
-    // Final fallback - use WiFi IP for physical devices
     return wifiBaseUrl;
   }
 

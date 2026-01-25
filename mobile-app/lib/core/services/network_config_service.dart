@@ -159,36 +159,51 @@ class NetworkConfigService {
   /// 4. Last known IP (if stored)
   /// 5. null (needs manual configuration)
   static Future<String> getDevelopmentBaseUrl() async {
-    // 1. Check stored preference
-    final stored = await getStoredBaseUrl();
-    if (stored != null && stored.isNotEmpty) {
-      return stored;
-    }
+    // Current Laptop WiFi IP - Most likely correct for physical device testing
+    const laptopWiFiIp = '192.168.100.187';
+    final laptopWiFiUrl = 'http://$laptopWiFiIp:$defaultPort$defaultPath';
 
-    // 2. Check environment variable
+    // 1. Check environment variable
     const envBaseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: '');
     if (envBaseUrl.isNotEmpty) {
-      // Store it for future use
-      await setStoredBaseUrl(envBaseUrl);
       return envBaseUrl;
     }
 
-    // 3. Platform-specific defaults
+    // 2. Check stored preference
+    final stored = await getStoredBaseUrl();
+    if (stored != null && stored.isNotEmpty) {
+      // If we are on a physical device, ignore the emulator IP
+      if (Platform.isAndroid && !kIsWeb && stored.contains('10.0.2.2')) {
+         debugPrint('[NetworkConfigService] Ignoring stored emulator IP on physical device');
+      } else {
+        return stored;
+      }
+    }
+
+    // 3. Try last known IP (Highest priority for physical devices)
+    final lastKnownIp = await getLastKnownIp();
+    if (lastKnownIp != null && lastKnownIp.isNotEmpty) {
+      // Validate IP (prevent using local loopback on physical devices)
+      if (Platform.isAndroid && !kIsWeb && (lastKnownIp.contains('127.0.0.1') || lastKnownIp.contains('localhost'))) {
+         debugPrint('[NetworkConfigService] Ignoring loopback IP on physical device');
+      } else {
+        final builtUrl = buildBaseUrl(lastKnownIp);
+        return builtUrl;
+      }
+    }
+
+    // 4. Platform-specific defaults (Emulator/Simulator fallback)
     final platformDefault = getPlatformDefaultBaseUrl();
     if (platformDefault != null) {
+      // On physical Android device, prefer the laptop WiFi IP over the emulator default
+      if (Platform.isAndroid && !kIsWeb) {
+        return laptopWiFiUrl;
+      }
       return platformDefault;
     }
 
-    // 4. Try last known IP
-    final lastKnownIp = await getLastKnownIp();
-    if (lastKnownIp != null && lastKnownIp.isNotEmpty) {
-      final builtUrl = buildBaseUrl(lastKnownIp);
-      await setStoredBaseUrl(builtUrl);
-      return builtUrl;
-    }
-
-    // 5. Fallback to localhost (won't work on physical devices but provides a default)
-    return 'http://localhost:$defaultPort$defaultPath';
+    // 5. Hardcoded WiFi IP fallback (For the current user's environment)
+    return laptopWiFiUrl;
   }
 
   /// Get WebSocket URL from base URL

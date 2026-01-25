@@ -48,12 +48,16 @@ class _ProfileScreenState extends State<ProfileScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   String _selectedTag = 'Founder'; // Default tag
-  int _selectedBottomNavIndex = 3; // Profile tab selected
+  int _selectedBottomNavIndex = 4; // Profile tab selected
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   Color? _dominantColor; // Store dominant color from cover photo
 
   // Determine if viewing own profile or someone else's
-  bool get _isOwnProfile => widget.username == null;
+  bool get _isOwnProfile {
+    if (widget.username == null) return true;
+    final authProvider = context.read<AuthProvider>();
+    return authProvider.currentUser?.username == widget.username;
+  }
 
 
 
@@ -141,8 +145,9 @@ class _ProfileScreenState extends State<ProfileScreen>
               setState(() {
                 _selectedBottomNavIndex = index;
               });
+            } else if (index == 4 && !_isOwnProfile) {
+              context.push('/profile');
             }
-            // Index 4 (Profile) stays on current screen
           },
         ),
         drawer: AppSideMenu(
@@ -204,8 +209,9 @@ class _ProfileScreenState extends State<ProfileScreen>
               setState(() {
                 _selectedBottomNavIndex = index;
               });
+            } else if (index == 4 && !_isOwnProfile) {
+              context.push('/profile');
             }
-            // Index 4 (Profile) stays on current screen
           },
         ),
         drawer: AppSideMenu(
@@ -312,8 +318,9 @@ class _ProfileScreenState extends State<ProfileScreen>
               setState(() {
                 _selectedBottomNavIndex = index;
               });
+            } else if (index == 4 && !_isOwnProfile) {
+              context.push('/profile');
             }
-          // Index 4 (Profile) stays on current screen
           },
         ),
         drawer: AppSideMenu(
@@ -580,7 +587,17 @@ class _ProfileHeaderBottom extends StatelessWidget {
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () {
-                      context.push('/chat/${user.id}');
+                      context.push(
+                        '/chat/${user.id}',
+                        extra: {
+                          'userName': user.displayName,
+                          'userUsername': '@${user.username}',
+                          'profilePicture': user.profilePicture != null 
+                              ? ApiConfig.constructSupabaseStorageUrl(user.profilePicture!)
+                              : null,
+                          'isOnline': false, // Will be updated by WebSocket in ChatScreen
+                        },
+                      );
                     },
                     style: OutlinedButton.styleFrom(
                       side: BorderSide(
@@ -1549,50 +1566,23 @@ class _FeedTabState extends State<_FeedTab> {
   @override
   void initState() {
     super.initState();
-    // Load posts when tab is initialized (only for own profile)
-    if (widget.isOwnProfile) {
+    // Load posts when tab is initialized
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final postsProvider = context.read<PostsProvider>();
+      if (widget.isOwnProfile) {
         postsProvider.loadUserPosts(refresh: true);
+      } else if (widget.user != null) {
+        postsProvider.loadPostsByUsername(widget.user.username, refresh: true);
+      }
     });
-    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // For other users' profiles, show empty state
-    if (!widget.isOwnProfile) {
-      return SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            minHeight: MediaQuery.of(context).size.height - 200,
-          ),
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.lock_outline,
-                    color: AppColors.textSecondary,
-                    size: 48,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'This user\'s posts are private',
-                    style: AppTextStyles.bodyMedium(
-                      color: AppColors.textSecondary,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
+    final postsProvider = context.watch<PostsProvider>();
+
+    if (!widget.isOwnProfile && postsProvider.isLoading && postsProvider.posts.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
     }
 
     return Consumer<PostsProvider>(
@@ -3322,39 +3312,161 @@ class _AboutTab extends StatelessWidget {
       return const Center(child: CircularProgressIndicator());
     }
 
-    // For other users' profiles, show limited public information
-    if (!isOwnProfile) {
-      return SingleChildScrollView(
-        physics: const BouncingScrollPhysics(
-          parent: AlwaysScrollableScrollPhysics(),
-        ),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            minHeight: MediaQuery.of(context).size.height - 200,
-          ),
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.info_outline,
-                    color: AppColors.textSecondary,
-                    size: 48,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Additional profile information is private',
-                    style: AppTextStyles.bodyMedium(
-                      color: AppColors.textSecondary,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-          ),
+    // List of widgets to display in the About tab
+    final List<Widget> children = [];
+
+    // Story Section - Only show if visible or it's own profile (to add it)
+    final bool showStory = isOwnProfile || (user.fieldVisibility?['story'] ?? true);
+    if (showStory) {
+      if (user.story != null && user.story!.isNotEmpty) {
+        children.add(_AboutSection(
+          title: 'Story',
+          icon: Icons.auto_stories_outlined,
+          content: user.story!,
+        ));
+      } else if (isOwnProfile) {
+        children.add(_AddPlaceholder(
+          title: 'Story',
+          icon: Icons.auto_stories_outlined,
+          placeholderText: 'Add a story',
+          onTap: () => context.push('/edit-profile/story'),
+        ));
+      }
+    }
+
+    // Ambition Section
+    final bool showAmbition = isOwnProfile || (user.fieldVisibility?['ambition'] ?? true);
+    if (showAmbition) {
+      if (user.ambition != null && user.ambition!.isNotEmpty) {
+        if (children.isNotEmpty) children.add(_SectionDivider());
+        children.add(_AboutSection(
+          title: 'Ambition',
+          icon: Icons.rocket_launch_outlined,
+          content: user.ambition!,
+        ));
+      } else if (isOwnProfile) {
+        if (children.isNotEmpty) children.add(_SectionDivider());
+        children.add(_AddPlaceholder(
+          title: 'Ambition',
+          icon: Icons.rocket_launch_outlined,
+          placeholderText: 'Add your ambition',
+          onTap: () => context.push('/edit-profile/ambition'),
+        ));
+      }
+    }
+
+    // Only show current user's profile data for experiences/etc for now
+    // as public endpoints for these are still placeholders or protected
+    if (isOwnProfile) {
+       // Experience Section
+      if (profileProvider.experiences.isNotEmpty) {
+        if (children.isNotEmpty) children.add(_SectionDivider());
+        children.add(_ExperienceSection(experiences: profileProvider.experiences));
+      }
+      
+      // Education Section
+      if (profileProvider.education.isNotEmpty) {
+        if (children.isNotEmpty) children.add(_SectionDivider());
+        children.add(_EducationSection(education: profileProvider.education));
+      }
+
+      // Skills Section
+      if (children.isNotEmpty) children.add(_SectionDivider());
+      if (profileProvider.skills.isNotEmpty) {
+        children.add(_SkillsSection(skills: profileProvider.skills));
+      } else {
+        children.add(_AddPlaceholder(
+          title: 'Skills',
+          icon: Icons.stars_outlined,
+          placeholderText: 'Add your skills',
+          onTap: () => context.push('/edit-profile/skills/add'),
+        ));
+      }
+
+      // Certifications Section
+      if (children.isNotEmpty) children.add(_SectionDivider());
+      if (profileProvider.certifications.isNotEmpty) {
+        children.add(_CertificationsSection(certifications: profileProvider.certifications));
+      } else {
+        children.add(_AddPlaceholder(
+          title: 'Certifications',
+          icon: Icons.workspace_premium_outlined,
+          placeholderText: 'Add your certifications',
+          onTap: () => context.push('/edit-profile/certifications/add'),
+        ));
+      }
+
+      // Languages Section
+      if (children.isNotEmpty) children.add(_SectionDivider());
+      if (profileProvider.languages.isNotEmpty) {
+        children.add(_LanguagesSection(languages: profileProvider.languages));
+      } else {
+        children.add(_AddPlaceholder(
+          title: 'Languages',
+          icon: Icons.translate,
+          placeholderText: 'Add languages you speak',
+          onTap: () => context.push('/edit-profile/languages/add'),
+        ));
+      }
+
+      // Volunteering Section
+      if (children.isNotEmpty) children.add(_SectionDivider());
+      if (profileProvider.volunteering.isNotEmpty) {
+        children.add(_VolunteeringSection(volunteering: profileProvider.volunteering));
+      } else {
+        children.add(_AddPlaceholder(
+          title: 'Volunteering',
+          icon: Icons.volunteer_activism_outlined,
+          placeholderText: 'Add your volunteer work',
+          onTap: () => context.push('/edit-profile/volunteering/add'),
+        ));
+      }
+
+      // Publications Section
+      if (children.isNotEmpty) children.add(_SectionDivider());
+      if (profileProvider.publications.isNotEmpty) {
+        children.add(_PublicationsSection(publications: profileProvider.publications));
+      } else {
+        children.add(_AddPlaceholder(
+          title: 'Publications',
+          icon: Icons.article_outlined,
+          placeholderText: 'Add your publications',
+          onTap: () => context.push('/edit-profile/publications/add'),
+        ));
+      }
+
+      // Interests Section
+      if (children.isNotEmpty) children.add(_SectionDivider());
+      if (profileProvider.interests.isNotEmpty) {
+        children.add(_InterestsSection(interests: profileProvider.interests));
+      } else {
+        children.add(_AddPlaceholder(
+          title: 'Interests',
+          icon: Icons.favorite_border,
+          placeholderText: 'Add your interests',
+          onTap: () => context.push('/edit-profile/interests/add'),
+        ));
+      }
+
+      // Achievements Section
+      if (children.isNotEmpty) children.add(_SectionDivider());
+      if (profileProvider.achievements.isNotEmpty) {
+        children.add(_AchievementsSection(achievements: profileProvider.achievements));
+      } else {
+        children.add(_AddPlaceholder(
+          title: 'Achievements',
+          icon: Icons.emoji_events_outlined,
+          placeholderText: 'Add your achievements',
+          onTap: () => context.push('/edit-profile/achievements/add'),
+        ));
+      }
+    }
+
+    if (children.isEmpty) {
+      return Center(
+        child: Text(
+          'No information provided yet',
+          style: AppTextStyles.bodyMedium(color: AppColors.textSecondary),
         ),
       );
     }
@@ -3364,107 +3476,7 @@ class _AboutTab extends StatelessWidget {
         parent: AlwaysScrollableScrollPhysics(),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      children: [
-        // Story Section - Only show if visible
-        (user.fieldVisibility?['story'] ?? true)
-            ? (user.story != null && user.story!.isNotEmpty
-            ? _AboutSection(
-                title: 'Story',
-                icon: Icons.auto_stories_outlined,
-                content: user.story!,
-              )
-            : _AddPlaceholder(
-                title: 'Story',
-                icon: Icons.auto_stories_outlined,
-                placeholderText: 'Add a story',
-                onTap: () => context.push('/edit-profile/story'),
-                  ))
-            : const SizedBox.shrink(),
-        _SectionDivider(),
-        // Experience Section
-        profileProvider.experiences.isNotEmpty
-            ? _ExperienceSection(experiences: profileProvider.experiences)
-            : const SizedBox.shrink(),
-        if (profileProvider.experiences.isNotEmpty) _SectionDivider(),
-        // Education Section
-        profileProvider.education.isNotEmpty
-            ? _EducationSection(education: profileProvider.education)
-            : const SizedBox.shrink(),
-        if (profileProvider.education.isNotEmpty) _SectionDivider(),
-        _SectionDivider(),
-        // Skills Section
-        profileProvider.skills.isNotEmpty
-            ? _SkillsSection(skills: profileProvider.skills)
-            : _AddPlaceholder(
-                title: 'Skills',
-                icon: Icons.stars_outlined,
-                placeholderText: 'Add your skills',
-                onTap: () => context.push('/edit-profile/skills/add'),
-              ),
-        _SectionDivider(),
-        // Certifications Section
-        profileProvider.certifications.isNotEmpty
-            ? _CertificationsSection(
-                certifications: profileProvider.certifications,
-              )
-            : _AddPlaceholder(
-                title: 'Certifications',
-                icon: Icons.workspace_premium_outlined,
-                placeholderText: 'Add your certifications',
-                onTap: () => context.push('/edit-profile/certifications/add'),
-              ),
-        _SectionDivider(),
-        // Languages Section
-        profileProvider.languages.isNotEmpty
-            ? _LanguagesSection(languages: profileProvider.languages)
-            : _AddPlaceholder(
-                title: 'Languages',
-                icon: Icons.translate,
-                placeholderText: 'Add languages you speak',
-                onTap: () => context.push('/edit-profile/languages/add'),
-              ),
-        _SectionDivider(),
-        // Volunteering Section
-        profileProvider.volunteering.isNotEmpty
-            ? _VolunteeringSection(volunteering: profileProvider.volunteering)
-            : _AddPlaceholder(
-                title: 'Volunteering',
-                icon: Icons.volunteer_activism_outlined,
-                placeholderText: 'Add your volunteer work',
-                onTap: () => context.push('/edit-profile/volunteering/add'),
-              ),
-        _SectionDivider(),
-        // Publications Section
-        profileProvider.publications.isNotEmpty
-            ? _PublicationsSection(publications: profileProvider.publications)
-            : _AddPlaceholder(
-                title: 'Publications',
-                icon: Icons.article_outlined,
-                placeholderText: 'Add your publications',
-                onTap: () => context.push('/edit-profile/publications/add'),
-              ),
-        _SectionDivider(),
-        // Interests Section
-        profileProvider.interests.isNotEmpty
-            ? _InterestsSection(interests: profileProvider.interests)
-            : _AddPlaceholder(
-                title: 'Interests',
-                icon: Icons.favorite_border,
-                placeholderText: 'Add your interests',
-                onTap: () => context.push('/edit-profile/interests/add'),
-              ),
-        _SectionDivider(),
-        // Achievements Section
-        profileProvider.achievements.isNotEmpty
-            ? _AchievementsSection(achievements: profileProvider.achievements)
-            : _AddPlaceholder(
-                title: 'Achievements',
-                icon: Icons.emoji_events_outlined,
-                placeholderText: 'Add your achievements',
-                onTap: () => context.push('/edit-profile/achievements/add'),
-              ),
-        const SizedBox(height: 20),
-      ],
+      children: children,
     );
   }
 }

@@ -1,11 +1,20 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../../../features/auth/data/providers/auth_provider.dart';
+import '../../data/providers/messages_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/widgets/gradient_background.dart';
+import '../../../../core/config/api_config.dart';
 import '../../data/services/messages_service.dart';
 import '../../data/services/messages_cache_service.dart';
+import '../../data/services/e2ee_service.dart';
+import '../../data/services/websocket_service.dart';
+import '../../data/models/message.dart';
 import '../../data/models/conversation.dart';
 
 class MessagesListScreen extends StatefulWidget {
@@ -19,27 +28,145 @@ class _MessagesListScreenState extends State<MessagesListScreen> {
   final TextEditingController _searchController = TextEditingController();
   final MessagesService _messagesService = MessagesService();
   final MessagesCacheService _cacheService = MessagesCacheService();
+  final E2EEService _e2eeService = E2EEService();
+  final WebSocketService _wsService = WebSocketService();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   
   List<Conversation> _conversations = [];
+  Map<String, String> _decryptedLastMessages = {};
   bool _isLoading = false; // Start with false - show cached data immediately
   bool _isRefreshing = false;
   String? _errorMessage;
+  Timer? _autoRefreshTimer;
 
   @override
   void initState() {
     super.initState();
     _loadConversations(); // Load cached first, then refresh
+    _initializeWebSocket();
+    _startAutoRefresh();
+  }
+
+  void _startAutoRefresh() {
+    // Poll every 5 seconds for new messages while screen is active
+    _autoRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted) {
+        _loadConversations(showLoading: false);
+      }
+    });
+  }
+
+  Future<void> _initializeWebSocket() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final currentUserId = authProvider.currentUserId;
+    print('[MessagesListScreen] 🔌 Initializing WebSocket for user: $currentUserId');
+    
+    if (currentUserId == null) {
+      print('[MessagesListScreen] ❌ No current user ID - skipping WebSocket init');
+      return;
+    }
+
+    // Connect WebSocket
+    final connected = await _wsService.connect(currentUserId);
+    print('[MessagesListScreen] 🔌 WebSocket connect result: $connected, isConnected: ${_wsService.isConnected}');
+    
+    // Register global listener for real-time list updates
+    _wsService.setGlobalHandler(_handleGlobalWebSocketMessage);
+    print('[MessagesListScreen] ✅ Global handler registered');
+  }
+
+  void _handleGlobalWebSocketMessage(WSMessageEnvelope envelope) {
+    if (!mounted) return;
+
+    print('[MessagesListScreen] 🌐 GLOBAL HANDLER received: type=${envelope.type}, conversationId=${envelope.conversationId}');
+    print('[MessagesListScreen] 🌐 GLOBAL HANDLER data: ${envelope.data}');
+
+    if (envelope.type == 'new_message') {
+      try {
+        final messageData = envelope.data as Map<String, dynamic>;
+        print('[MessagesListScreen] ✅ Parsing message data: $messageData');
+        final message = Message.fromJson(messageData);
+        print('[MessagesListScreen] ✅ Message parsed successfully: id=${message.id}, content=${message.content}');
+        _updateConversationWithNewMessage(message);
+      } catch (e, stack) {
+        print('[MessagesListScreen] ❌ Error parsing real-time message: $e');
+        print('[MessagesListScreen] Stack: $stack');
+      }
+    }
+  }
+
+  Future<void> _updateConversationWithNewMessage(Message message) async {
+    if (!mounted) return;
+
+    setState(() {
+      final index = _conversations.indexWhere((c) => c.id == message.conversationId);
+      
+      if (index != -1) {
+        // Update existing conversation
+        final updatedConv = _conversations[index].copyWith(
+          lastMessageContent: message.content,
+          lastMessageEncrypted: message.encryptedContent,
+          lastMessageIv: message.iv,
+          lastMessageAt: message.createdAt,
+          lastMessageSenderId: message.senderId,
+          unreadCount: message.isMine ? _conversations[index].unreadCount : _conversations[index].unreadCount + 1,
+        );
+        
+        // Remove and re-insert at top
+        _conversations.removeAt(index);
+        _conversations.insert(0, updatedConv);
+      } else {
+        // Conversation not in list, might need full refresh or build new one
+        // For simplicity, just refresh
+        _loadConversations(showLoading: false);
+      }
+    });
+
+    // Decrypt if E2EE
+    if (message.encryptedContent != null && message.iv != null) {
+      try {
+        final decrypted = await _e2eeService.decrypt(
+          message.encryptedContent!,
+          message.iv!,
+          message.conversationId,
+        );
+        
+        if (mounted) {
+          setState(() {
+            _decryptedLastMessages[message.conversationId] = decrypted;
+          });
+        }
+      } catch (e) {
+        print('[MessagesListScreen] Failed to decrypt real-time message: $e');
+      }
+    } else {
+      if (mounted) {
+        setState(() {
+          _decryptedLastMessages[message.conversationId] = message.content;
+        });
+      }
+    }
+
+    // Cache updated list
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (authProvider.currentUserId != null) {
+      _cacheService.cacheConversations(authProvider.currentUserId!, _conversations);
+    }
   }
 
   Future<void> _loadConversations({bool showLoading = false}) async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final currentUserId = authProvider.currentUserId;
+    if (currentUserId == null) return;
+
     // Load cached data first for instant display
-    final cached = await _cacheService.getCachedConversations();
+    final cached = await _cacheService.getCachedConversations(currentUserId);
     if (cached != null && cached.isNotEmpty && mounted) {
       setState(() {
         _conversations = cached;
         _isLoading = false;
       });
+      _decryptLastMessagesInBackground(cached);
     } else if (showLoading) {
       setState(() {
         _isLoading = true;
@@ -54,20 +181,31 @@ class _MessagesListScreenState extends State<MessagesListScreen> {
     );
 
     if (mounted) {
-      setState(() {
-        _isLoading = false;
-        _isRefreshing = false;
-        if (response.success && response.data != null) {
+      if (response.success && response.data != null) {
+        // Refresh total unread count in provider
+        try {
+          final messagesProvider = Provider.of<MessagesProvider>(context, listen: false);
+          messagesProvider.refreshUnreadCount();
+        } catch (_) {}
+        
+        setState(() {
+          _isLoading = false;
+          _isRefreshing = false;
           _conversations = response.data!;
           // Cache the fresh data
-          _cacheService.cacheConversations(response.data!);
-        } else {
+          _cacheService.cacheConversations(currentUserId, response.data!);
+        });
+        _decryptLastMessagesInBackground(response.data!);
+      } else {
+        setState(() {
+          _isLoading = false;
+          _isRefreshing = false;
           // Only show error if we don't have cached data
           if (_conversations.isEmpty) {
             _errorMessage = response.error ?? 'Failed to load conversations';
           }
-        }
-      });
+        });
+      }
     }
   }
 
@@ -98,17 +236,62 @@ class _MessagesListScreenState extends State<MessagesListScreen> {
     }
   }
 
+  /// Decrypt last messages in background for all conversations
+  Future<void> _decryptLastMessagesInBackground(List<Conversation> conversations) async {
+    for (final conv in conversations) {
+      // Skip if already decrypted
+      if (_decryptedLastMessages.containsKey(conv.id)) continue;
+
+      // Handle encrypted last message
+      if (conv.lastMessageEncrypted != null && conv.lastMessageIv != null) {
+        try {
+          final decrypted = await _e2eeService.decrypt(
+            conv.lastMessageEncrypted!,
+            conv.lastMessageIv!,
+            conv.id,
+          );
+          
+          if (mounted) {
+            setState(() {
+              _decryptedLastMessages[conv.id] = decrypted;
+            });
+          }
+        } catch (e) {
+          print('[MessagesList] Failed to decrypt preview for ${conv.id}: $e');
+          if (mounted) {
+            setState(() {
+              _decryptedLastMessages[conv.id] = 'Encrypted message';
+            });
+          }
+        }
+      } 
+      // Fallback: If it's a legacy plaintext message or system message
+      else if (conv.lastMessageContent != null && conv.lastMessageContent!.isNotEmpty) {
+        if (mounted) {
+          setState(() {
+            _decryptedLastMessages[conv.id] = conv.lastMessageContent!;
+          });
+        }
+      }
+    }
+  }
+
   // Convert Conversation to UI format
   List<Map<String, dynamic>> _getConversationsForUI() {
     return _conversations.map((conv) {
       final otherUser = conv.otherUser;
+      final rawAvatar = otherUser?.profilePicture;
+      final resolvedAvatar = rawAvatar != null 
+          ? ApiConfig.constructSupabaseStorageUrl(rawAvatar)
+          : null;
+
       return {
         'conversationId': conv.id,
         'userId': otherUser?.id ?? conv.participant2Id,
         'name': otherUser?.displayName ?? 'Unknown User',
         'username': otherUser != null ? '@${otherUser.username}' : '@unknown',
-        'avatar': otherUser?.profilePicture,
-        'lastMessage': conv.lastMessageContent ?? '',
+        'avatar': resolvedAvatar,
+        'lastMessage': _decryptedLastMessages[conv.id] ?? conv.lastMessageContent ?? '',
         'timestamp': _formatTimestamp(conv.lastMessageAt),
         'unreadCount': conv.unreadCount,
         'isOnline': conv.isOnline ?? false,
@@ -222,6 +405,8 @@ class _MessagesListScreenState extends State<MessagesListScreen> {
 
   @override
   void dispose() {
+    _autoRefreshTimer?.cancel();
+    _wsService.setGlobalHandler(null);
     _searchController.dispose();
     super.dispose();
   }
@@ -238,6 +423,177 @@ class _MessagesListScreenState extends State<MessagesListScreen> {
       builder: (context) => _MessagesMenuDialog(
         onOptionSelected: _handleMenuOption,
       ),
+    );
+  }
+
+  void _showE2EEDetailDrawer() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: AppColors.backgroundPrimary,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle bar
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.textSecondary.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 32),
+            
+            // Security Icon
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: AppColors.accentPrimary.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.security_rounded,
+                size: 40,
+                color: AppColors.accentPrimary,
+              ),
+            ),
+            const SizedBox(height: 24),
+            
+            // Title
+            Text(
+              'Your privacy is our priority',
+              style: AppTextStyles.headlineSmall(
+                weight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            
+            // Description
+            Text(
+              'Histeeria protects your privacy with end-to-end encryption. This means your conversations are fully private and secure.',
+              style: AppTextStyles.bodyLarge(
+                color: AppColors.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            
+            // Feature list
+            _buildPrivacyFeature(
+              Icons.chat_bubble_outline_rounded,
+              'Messages & Media',
+              'Your chats, audios, videos, images, and files are only visible to you and the person you\'re talking to.',
+            ),
+            const SizedBox(height: 20),
+            _buildPrivacyFeature(
+              Icons.call_outlined,
+              'Voice & Video Calls',
+              'Your calls are secure. No one in the world, including Histeeria, can listen to or see them.',
+            ),
+            const SizedBox(height: 32),
+            
+            // Reassurance
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.backgroundSecondary.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: AppColors.glassBorder.withOpacity(0.1),
+                ),
+              ),
+              child: Row(
+                children: [
+                   Icon(
+                    Icons.lock_outline_rounded,
+                    size: 20,
+                    color: AppColors.accentPrimary,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Not even Histeeria can access your data.',
+                      style: AppTextStyles.bodySmall(
+                        weight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 32),
+            
+            // Close Button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accentPrimary,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 0,
+                ),
+                child: Text(
+                  'Understood',
+                  style: AppTextStyles.labelLarge(
+                    color: Colors.white,
+                    weight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(height: MediaQuery.of(context).padding.bottom),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPrivacyFeature(IconData icon, String title, String description) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          icon,
+          size: 24,
+          color: AppColors.accentPrimary,
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: AppTextStyles.bodyLarge(
+                  weight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                description,
+                style: AppTextStyles.bodySmall(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -279,26 +635,6 @@ class _MessagesListScreenState extends State<MessagesListScreen> {
               _MessagesHeader(
                 onBack: () => context.pop(),
                 onMenuTap: _showMessagesMenu,
-              ),
-              // Warning banner about messaging stability
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: AppColors.accentQuaternary.withOpacity(0.06),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: AppColors.accentQuaternary.withOpacity(0.12),
-                      width: 0.5,
-                    ),
-                  ),
-                  child: Text(
-                    "Messages won't work great! After the end-to-end encryption, a lot of features are failing. We recommend using an alternative way of messaging until we solve this in the next update.",
-                    style: AppTextStyles.bodySmall(color: AppColors.accentQuaternary),
-                  ),
-                ),
               ),
               // Conversations list with search bar
               Expanded(
@@ -357,6 +693,7 @@ class _MessagesListScreenState extends State<MessagesListScreen> {
                                 _ConversationsList(
                                   conversations: _getConversationsForUI(),
                                   searchController: _searchController,
+                                  onE2EETap: _showE2EEDetailDrawer,
                                 ),
                                 if (_isRefreshing)
                                   Positioned(
@@ -406,17 +743,44 @@ class _MessagesHeader extends StatelessWidget {
           ),
           child: Row(
             children: [
-              // Back arrow
-              GestureDetector(
-                onTap: onBack,
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  child: Icon(
-                    Icons.arrow_back_ios,
-                    color: AppColors.textPrimary,
-                    size: 20,
-                  ),
-                ),
+              // Current User Profile Photo
+              Consumer<AuthProvider>(
+                builder: (context, authProvider, _) {
+                  final user = authProvider.currentUser;
+                  final profilePicture = user?.profilePicture;
+                  
+                  return Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: AppColors.glassBorder.withOpacity(0.2),
+                        width: 1,
+                      ),
+                    ),
+                    child: profilePicture != null && profilePicture.isNotEmpty
+                        ? ClipOval(
+                            child: CachedNetworkImage(
+                              imageUrl: profilePicture,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => Container(
+                                color: AppColors.accentPrimary.withOpacity(0.1),
+                              ),
+                              errorWidget: (context, url, error) => Icon(
+                                Icons.person,
+                                size: 20,
+                                color: AppColors.accentPrimary,
+                              ),
+                            ),
+                          )
+                        : Icon(
+                            Icons.person,
+                            size: 20,
+                            color: AppColors.accentPrimary,
+                          ),
+                  );
+                },
               ),
               const SizedBox(width: 12),
               // Title
@@ -428,6 +792,9 @@ class _MessagesHeader extends StatelessWidget {
                   ),
                 ),
               ),
+              // Back arrow (moved to right or kept as is? instructions just said add photo inside header... usually left)
+              // I'll put photo on left, title in middle, menu on right.
+              // Instagram has story circles... I'll just add it before title.
               // Menu dots
               GestureDetector(
                 onTap: onMenuTap,
@@ -496,10 +863,12 @@ class _SearchBar extends StatelessWidget {
 class _ConversationsList extends StatelessWidget {
   final List<Map<String, dynamic>> conversations;
   final TextEditingController searchController;
+  final VoidCallback onE2EETap;
 
   const _ConversationsList({
     required this.conversations,
     required this.searchController,
+    required this.onE2EETap,
   });
 
   @override
@@ -538,6 +907,48 @@ class _ConversationsList extends StatelessWidget {
         parent: BouncingScrollPhysics(),
       ),
       slivers: [
+        // E2EE Banner
+        SliverToBoxAdapter(
+          child: GestureDetector(
+            onTap: onE2EETap,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 0),
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.lock_outline_rounded,
+                    size: 14,
+                    color: AppColors.textSecondary,
+                  ),
+                  const SizedBox(width: 8),
+                  RichText(
+                    text: TextSpan(
+                      style: AppTextStyles.bodySmall(
+                        color: AppColors.textSecondary,
+                      ),
+                      children: [
+                        const TextSpan(text: 'Your messages are '),
+                        TextSpan(
+                          text: 'end-to-end encrypted',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.accentPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
         // Search bar (scrolls away)
         SliverToBoxAdapter(
           child: _SearchBar(controller: searchController),
@@ -560,6 +971,7 @@ class _ConversationsList extends StatelessWidget {
         return _ConversationTile(
           name: conversation['name'] as String,
           username: conversation['username'] as String,
+          avatar: conversation['avatar'] as String?,
           lastMessage: conversation['lastMessage'] as String,
           timestamp: conversation['timestamp'] as String,
           unreadCount: conversation['unreadCount'] as int,
@@ -567,11 +979,12 @@ class _ConversationsList extends StatelessWidget {
           onTap: () {
             // Navigate to chat screen
             context.push(
-              '/chat/${conversation['conversationId']}',
+              '/chat/${conversation['userId']}',
               extra: {
                 'conversationId': conversation['conversationId'],
                 'userName': conversation['name'],
                 'userUsername': conversation['username'],
+                'profilePicture': conversation['avatar'],
                 'isOnline': conversation['isOnline'],
               },
             );
@@ -589,6 +1002,7 @@ class _ConversationsList extends StatelessWidget {
 class _ConversationTile extends StatelessWidget {
   final String name;
   final String username;
+  final String? avatar;
   final String lastMessage;
   final String timestamp;
   final int unreadCount;
@@ -598,6 +1012,7 @@ class _ConversationTile extends StatelessWidget {
   const _ConversationTile({
     required this.name,
     required this.username,
+    this.avatar,
     required this.lastMessage,
     required this.timestamp,
     required this.unreadCount,
@@ -628,11 +1043,34 @@ class _ConversationTile extends StatelessWidget {
                       width: 1,
                     ),
                   ),
-                  child: Icon(
-                    Icons.person,
-                    color: AppColors.accentPrimary,
-                    size: 28,
-                  ),
+                  child: avatar != null && avatar!.isNotEmpty
+                      ? ClipOval(
+                          child: CachedNetworkImage(
+                            imageUrl: avatar!,
+                            fit: BoxFit.cover,
+                            width: 56,
+                            height: 56,
+                            placeholder: (context, url) => Center(
+                              child: Icon(
+                                Icons.person,
+                                color: AppColors.accentPrimary,
+                                size: 28,
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => Center(
+                              child: Icon(
+                                Icons.person,
+                                color: AppColors.accentPrimary,
+                                size: 28,
+                              ),
+                            ),
+                          ),
+                        )
+                      : Icon(
+                          Icons.person,
+                          color: AppColors.accentPrimary,
+                          size: 28,
+                        ),
                 ),
                 // Online indicator
                 if (isOnline)

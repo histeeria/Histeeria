@@ -20,6 +20,7 @@ import '../../../../core/api/api_client.dart';
 import '../../../../core/config/api_config.dart';
 import '../../../../features/auth/data/providers/auth_provider.dart';
 import '../../../../features/auth/data/models/user.dart';
+import '../../data/providers/messages_provider.dart';
 import '../../data/services/messages_service.dart';
 import '../../data/services/websocket_service.dart';
 import '../../data/services/e2ee_service.dart';
@@ -35,6 +36,7 @@ class ChatScreen extends StatefulWidget {
   final String userId;
   final String userName;
   final String userUsername;
+  final String? profilePicture;
   final bool isOnline;
 
   const ChatScreen({
@@ -42,6 +44,7 @@ class ChatScreen extends StatefulWidget {
     required this.userId,
     required this.userName,
     required this.userUsername,
+    this.profilePicture,
     required this.isOnline,
   });
 
@@ -76,6 +79,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final Map<String, Map<String, String>> _messageReactions = {}; // messageId -> {userId: emoji}
   Set<String> _deletedMessageIds = {}; // Locally deleted message IDs (for "Delete for Me")
   Set<String> _deletedForEveryoneIds = {}; // Locally deleted message IDs (for "Delete for Everyone")
+  final Map<String, String> _decryptedMessagesMap = {}; // messageId -> decryptedContent
   bool _isLoading = true;
   bool _isSending = false;
   String? _errorMessage;
@@ -116,7 +120,7 @@ class _ChatScreenState extends State<ChatScreen> {
       
       return {
         'id': msg.id,
-        'text': msg.content,
+        'text': _decryptedMessagesMap[msg.id] ?? msg.content,
         'isMe': msg.isMine,
         'timestamp': msg.createdAt,
         'status': msg.status,
@@ -129,7 +133,10 @@ class _ChatScreenState extends State<ChatScreen> {
         'attachmentName': msg.attachmentName,
         'attachmentSize': msg.attachmentSize,
         'attachmentType': msg.attachmentType,
-        'reactions': _messageReactions[msg.id] ?? <String, String>{},
+        'reactions': {
+          ...?(msg.reactions),
+          ...(_messageReactions[msg.id] ?? {}),
+        },
         'isStarred': msg.isStarred ?? false,
         'isPinned': msg.isPinned ?? false,
         'replyToId': msg.replyToId,
@@ -223,31 +230,49 @@ class _ChatScreenState extends State<ChatScreen> {
       _wsService.subscribeToConversation(_conversationId!, _handleWebSocketMessage);
       
       // Mark as read
-      _messagesService.markAsRead(_conversationId!);
+      _messagesService.markAsRead(_conversationId!).then((_) {
+        // Refresh total unread count in provider
+        try {
+          final messagesProvider = Provider.of<MessagesProvider>(context, listen: false);
+          messagesProvider.refreshUnreadCount();
+        } catch (_) {}
+      });
+    } else {
+      // If we couldn't get a conversation, we must stop loading
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
   Future<void> _loadOrCreateConversation() async {
     try {
-      // Check if userId is actually a conversationId (UUID format) or a userId
       // UUIDs have format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (36 chars with dashes)
       final isUUID = widget.userId.length == 36 && widget.userId.contains('-');
       
       if (isUUID) {
-        // Likely a conversation ID - try to load it
-        final response = await _messagesService.getConversation(widget.userId);
+        // First try to treat as userId and start/get conversation
+        // This is more robust as clicking from profile usually provides a userId
+        final response = await _messagesService.startConversation(widget.userId);
         if (response.success && response.data != null) {
           setState(() {
             _conversationId = response.data!.id;
           });
-        } else {
-          // Not a conversation, try as userId to create new conversation
-          await _createNewConversation();
+          return;
         }
-      } else {
-        // Not a UUID, treat as userId and create new conversation
-        await _createNewConversation();
-      }
+
+        // If that fails, try to load it as a direct conversation ID
+        final convResponse = await _messagesService.getConversation(widget.userId);
+        if (convResponse.success && convResponse.data != null) {
+          setState(() {
+            _conversationId = convResponse.data!.id;
+          });
+          return;
+        }
+      } 
+      
+      // Fallback or non-UUID
+      await _createNewConversation();
     } catch (e) {
       setState(() {
         _errorMessage = 'Failed to load conversation: ${e.toString()}';
@@ -351,6 +376,11 @@ class _ChatScreenState extends State<ChatScreen> {
         // Scroll to bottom immediately after setting messages
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _scrollToBottomImmediate();
+          
+          // Second pass after a short delay to account for potential image/layout shifts
+          Future.delayed(const Duration(milliseconds: 100), () {
+            if (mounted) _scrollToBottomImmediate();
+          });
         });
 
         // Decrypt messages in background (non-blocking)
@@ -421,59 +451,30 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _decryptMessagesInBackground(List<Message> messages) async {
     print('[ChatScreen] Decrypting ${messages.length} messages in background');
     // Decrypt messages that need decryption
-    final decryptedMessages = await Future.wait(
-      messages.map((msg) => _decryptMessageIfNeeded(msg)),
+    final decryptedResults = await Future.wait(
+      messages.map((msg) async {
+        if (msg.encryptedContent == null || msg.encryptedContent!.isEmpty) {
+          return MapEntry(msg.id, msg.content);
+        }
+        try {
+          final decrypted = await _e2eeService.decrypt(
+            msg.encryptedContent!,
+            msg.iv!,
+            _conversationId!,
+          );
+          return MapEntry(msg.id, decrypted);
+        } catch (e) {
+          print('[ChatScreen] Decryption failed for ${msg.id}: $e');
+          return MapEntry(msg.id, 'Encrypted message');
+        }
+      }),
     );
 
     if (mounted) {
       setState(() {
-        // Preserve deleted state when decrypting
-        final processedMessages = decryptedMessages.map<Message>((msg) {
-          print('[ChatScreen] Decrypted message ${msg.id}, type: ${msg.messageType}, attachmentUrl: ${msg.attachmentUrl}, attachmentName: ${msg.attachmentName}');
-          // If message was marked as deleted, preserve that state
-          if (_deletedForEveryoneIds.contains(msg.id)) {
-            return Message(
-              id: msg.id,
-              conversationId: msg.conversationId,
-              senderId: msg.senderId,
-              content: msg.content,
-              encryptedContent: msg.encryptedContent,
-              iv: msg.iv,
-              messageType: msg.messageType,
-              status: msg.status,
-              createdAt: msg.createdAt,
-              updatedAt: msg.updatedAt,
-              isDeleted: true,
-              deletedAt: msg.deletedAt ?? DateTime.now(),
-              deletedFor: 'everyone',
-              isMine: msg.isMine,
-              sender: msg.sender,
-              replyToId: msg.replyToId,
-              isForwarded: msg.isForwarded,
-              editedAt: msg.editedAt,
-              editCount: msg.editCount,
-              isStarred: msg.isStarred,
-              isPinned: msg.isPinned,
-              deliveredAt: msg.deliveredAt,
-              readAt: msg.readAt,
-              // Preserve attachment fields
-              attachmentUrl: msg.attachmentUrl,
-              attachmentName: msg.attachmentName,
-              attachmentSize: msg.attachmentSize,
-              attachmentType: msg.attachmentType,
-            );
-          }
-          return msg;
-        }).toList();
-        
-        print('[ChatScreen] Processed ${processedMessages.length} messages after decryption, setting to state');
-        
-        // Ensure messages are sorted by timestamp (oldest to newest, newest at bottom)
-        processedMessages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
-        
-        setState(() {
-          _messages = processedMessages;
-        });
+        for (final entry in decryptedResults) {
+          _decryptedMessagesMap[entry.key] = entry.value;
+        }
       });
     }
   }
@@ -1733,6 +1734,7 @@ class _ChatScreenState extends State<ChatScreen> {
       builder: (context) => _UserPreviewDialog(
         userName: widget.userName,
         userUsername: widget.userUsername,
+        profilePicture: widget.profilePicture,
         isOnline: widget.isOnline,
       ),
       routeSettings: const RouteSettings(),
@@ -3029,13 +3031,14 @@ class _ChatScreenState extends State<ChatScreen> {
               _ChatHeader(
                 userName: widget.userName,
                 userUsername: widget.userUsername,
+                profilePicture: widget.profilePicture,
                 isOnline: widget.isOnline,
                 onBack: () => context.pop(),
                 onVoiceCall: () {
-                  _showNotification('Voice call feature coming soon', false);
+                  _showNotification('This feature is coming in the next update! stay tuned', false);
                 },
                 onVideoCall: () {
-                  _showNotification('Video call feature coming soon', false);
+                  _showNotification('This feature is coming in the next update! stay tuned', false);
                 },
                 onMenuTap: () => _showChatMenu(),
                 onProfileTap: () => _showUserPreview(),
@@ -3184,6 +3187,7 @@ class _SelectionModeHeader extends StatelessWidget {
 class _ChatHeader extends StatelessWidget {
   final String userName;
   final String userUsername;
+  final String? profilePicture;
   final bool isOnline;
   final VoidCallback onBack;
   final VoidCallback onVoiceCall;
@@ -3194,6 +3198,7 @@ class _ChatHeader extends StatelessWidget {
   const _ChatHeader({
     required this.userName,
     required this.userUsername,
+    this.profilePicture,
     required this.isOnline,
     required this.onBack,
     required this.onVoiceCall,
@@ -3242,11 +3247,34 @@ class _ChatHeader extends StatelessWidget {
                           width: 1,
                         ),
                       ),
-                      child: Icon(
-                        Icons.person,
-                        color: AppColors.accentPrimary,
-                        size: 24,
-                      ),
+                      child: profilePicture != null && profilePicture!.isNotEmpty
+                          ? ClipOval(
+                              child: CachedNetworkImage(
+                                imageUrl: profilePicture!,
+                                fit: BoxFit.cover,
+                                width: 40,
+                                height: 40,
+                                placeholder: (context, url) => Center(
+                                  child: Icon(
+                                    Icons.person,
+                                    color: AppColors.accentPrimary,
+                                    size: 24,
+                                  ),
+                                ),
+                                errorWidget: (context, url, error) => Center(
+                                  child: Icon(
+                                    Icons.person,
+                                    color: AppColors.accentPrimary,
+                                    size: 24,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : Icon(
+                              Icons.person,
+                              color: AppColors.accentPrimary,
+                              size: 24,
+                            ),
                     ),
                     // Online indicator
                     if (isOnline)
@@ -4705,43 +4733,26 @@ class _ChatFooterState extends State<_ChatFooter>
                         )
                       else
                         GestureDetector(
-                          onLongPress: widget.onStartRecording,
-                          onLongPressEnd: (details) {
-                            if (!widget.isRecordingLocked) {
-                              widget.onStopRecording();
-                            }
-                          },
-                          onPanUpdate: (details) {
-                            if (widget.isRecordingAudio) {
-                                  // Check if dragged up (lock) or left (cancel)
-                                  final dragUp = -details.delta.dy;
-                                  final dragLeft = -details.delta.dx;
-
-                                  // Lock when dragged up significantly
-                              if (dragUp > 20 && !widget.isRecordingLocked) {
-                                widget.onLockRecording();
-                                  }
-                                  // Cancel when dragged left significantly
-                                  else if (dragLeft > 30) {
-                                widget.onCancelRecording();
-                              }
-                            }
-                          },
-                          onPanEnd: (details) {
-                            if (widget.isRecordingAudio && !widget.isRecordingLocked) {
-                              widget.onStopRecording();
-                            }
+                          onTap: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  "We appologize for the inconvenience but voice notes are not working properly after end to end encryption.. we are working very hard to fix this feature",
+                                  style: AppTextStyles.bodyMedium(color: Colors.white),
+                                ),
+                                backgroundColor: AppColors.error,
+                                duration: const Duration(seconds: 4),
+                              ),
+                            );
                           },
                           child: Container(
                             width: 48,
                             decoration: BoxDecoration(
-                              color: widget.isRecordingAudio
-                                  ? AppColors.accentQuaternary
-                                  : AppColors.accentPrimary,
+                              color: AppColors.accentPrimary,
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
-                              widget.isRecordingAudio ? Icons.mic : Icons.mic,
+                              Icons.mic,
                               color: Colors.white,
                               size: 24,
                             ),
@@ -5491,11 +5502,13 @@ class _TopRightNotificationState extends State<_TopRightNotification>
 class _UserPreviewDialog extends StatelessWidget {
   final String userName;
   final String userUsername;
+  final String? profilePicture;
   final bool isOnline;
 
   const _UserPreviewDialog({
     required this.userName,
     required this.userUsername,
+    this.profilePicture,
     required this.isOnline,
   });
 
@@ -5528,6 +5541,7 @@ class _UserPreviewDialog extends StatelessWidget {
               _UserPreviewHeader(
                 userName: userName,
                 userUsername: userUsername,
+                profilePicture: profilePicture,
                 isOnline: isOnline,
               ),
               Expanded(
@@ -5548,7 +5562,10 @@ class _UserPreviewDialog extends StatelessWidget {
                     const SizedBox(height: 8),
                     _MediaGallerySection(),
                     const SizedBox(height: 8),
-                    _ActionsSection(userName: userName),
+                    _ActionsSection(
+                      userName: userName,
+                      userUsername: userUsername.replaceAll('@', ''),
+                    ),
                     SizedBox(height: bottomPadding + 8),
                   ],
                 ),
@@ -5564,11 +5581,13 @@ class _UserPreviewDialog extends StatelessWidget {
 class _UserPreviewHeader extends StatelessWidget {
   final String userName;
   final String userUsername;
+  final String? profilePicture;
   final bool isOnline;
 
   const _UserPreviewHeader({
     required this.userName,
     required this.userUsername,
+    this.profilePicture,
     required this.isOnline,
   });
 
@@ -5592,11 +5611,34 @@ class _UserPreviewHeader extends StatelessWidget {
                     width: 3,
                   ),
                 ),
-                child: Icon(
-                  Icons.person,
-                  color: AppColors.accentPrimary,
-                  size: 60,
-                ),
+                child: profilePicture != null && profilePicture!.isNotEmpty
+                    ? ClipOval(
+                        child: CachedNetworkImage(
+                          imageUrl: profilePicture!,
+                          fit: BoxFit.cover,
+                          width: 120,
+                          height: 120,
+                          placeholder: (context, url) => Center(
+                            child: Icon(
+                              Icons.person,
+                              color: AppColors.accentPrimary,
+                              size: 60,
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => Center(
+                            child: Icon(
+                              Icons.person,
+                              color: AppColors.accentPrimary,
+                              size: 60,
+                            ),
+                          ),
+                        ),
+                      )
+                    : Icon(
+                        Icons.person,
+                        color: AppColors.accentPrimary,
+                        size: 60,
+                      ),
               ),
               if (isOnline)
                 Positioned(
@@ -5803,14 +5845,28 @@ class _MediaGallerySection extends StatelessWidget {
 
 class _ActionsSection extends StatelessWidget {
   final String userName;
+  final String userUsername;
 
-  const _ActionsSection({required this.userName});
+  const _ActionsSection({
+    required this.userName,
+    required this.userUsername,
+  });
 
   @override
   Widget build(BuildContext context) {
     return _SectionContainer(
       children: [
         _SectionTitle(title: 'Actions'),
+        _ActionTile(
+          icon: Icons.person_outline,
+          title: 'View Profile',
+          isDestructive: false,
+          onTap: () {
+            Navigator.pop(context); // Close dialog
+            context.push('/profile/$userUsername');
+          },
+        ),
+        _Divider(),
         _ActionTile(
           icon: Icons.person_remove_outlined,
           title: 'Unfollow',

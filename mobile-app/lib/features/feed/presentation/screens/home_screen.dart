@@ -10,6 +10,8 @@ import '../../../../core/widgets/app_bottom_navigation.dart';
 import '../../../../core/widgets/app_side_menu.dart';
 import '../../../../core/config/api_config.dart';
 import '../../data/providers/feed_provider.dart';
+import '../../../notifications/data/providers/notification_provider.dart';
+import '../../../messages/data/providers/messages_provider.dart';
 import '../../../auth/data/providers/auth_provider.dart';
 import '../../../posts/data/models/post.dart';
 import '../../../posts/data/models/poll.dart';
@@ -19,7 +21,6 @@ import '../../../posts/presentation/widgets/comment_drawer.dart';
 import '../../../posts/presentation/widgets/share_drawer.dart';
 import '../../../statuses/data/models/status.dart';
 import '../../../../core/utils/date_utils.dart' as app_date_utils;
-import '../../../notifications/data/providers/notification_provider.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -57,34 +58,40 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             children: [
               // Header - Instagram style with transparent overlay
-              AppHeader(
-                onMenuTap: () => _scaffoldKey.currentState?.openDrawer(),
-                messageBadge: 0, // TODO: Add message count
-                onMessageTap: () {
-                  context.push('/messages');
-                },
+              Consumer2<MessagesProvider, NotificationProvider>(
+                builder: (context, messagesProvider, notificationProvider, _) => AppHeader(
+                  onMenuTap: () => _scaffoldKey.currentState?.openDrawer(),
+                  messageBadge: messagesProvider.totalUnreadCount,
+                  onMessageTap: () {
+                    context.push('/messages');
+                  },
+                ),
               ),
               // Feed content
               Expanded(child: _FeedContent(activityTagsKey: _activityTagsKey)),
               // Bottom Navigation - Instagram style with transparent overlay
-              AppBottomNavigation(
-                selectedIndex: _selectedBottomNavIndex,
-                onTap: (index) {
-                  if (index == 1) {
-                    // Navigate to search screen
-                    context.push('/search');
-                  } else if (index == 3) {
-                    // Navigate to notifications screen
-                    context.push('/notifications');
-                  } else if (index == 4) {
-                    // Navigate to profile screen
-                    context.push('/profile');
-                  } else {
-                    setState(() {
-                      _selectedBottomNavIndex = index;
-                    });
-                  }
-                },
+              // Bottom Navigation - Instagram style with transparent overlay
+              Consumer<NotificationProvider>(
+                builder: (context, notificationProvider, _) => AppBottomNavigation(
+                  selectedIndex: _selectedBottomNavIndex,
+                  notificationBadge: notificationProvider.unreadCount,
+                  onTap: (index) {
+                    if (index == 1) {
+                      // Navigate to search screen
+                      context.push('/search');
+                    } else if (index == 3) {
+                      // Navigate to notifications screen
+                      context.push('/notifications');
+                    } else if (index == 4) {
+                      // Navigate to profile screen
+                      context.push('/profile');
+                    } else {
+                      setState(() {
+                        _selectedBottomNavIndex = index;
+                      });
+                    }
+                  },
+                ),
               ),
             ],
           ),

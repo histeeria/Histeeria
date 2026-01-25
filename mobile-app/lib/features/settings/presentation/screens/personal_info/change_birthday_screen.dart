@@ -55,7 +55,7 @@ class _ChangeBirthdayScreenState extends State<ChangeBirthdayScreen> {
     // Validate age again
     final age = DateTime.now().difference(_selectedDate).inDays ~/ 365;
     if (age < 13) {
-      _showMessage('You must be at least 13 years old to use Asteria');
+      _showMessage('You must be at least 13 years old to use Histeeria');
       return;
     }
 

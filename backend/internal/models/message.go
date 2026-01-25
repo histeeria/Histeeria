@@ -30,20 +30,22 @@ const (
 
 // Conversation represents a 1-on-1 chat between two users
 type Conversation struct {
-	ID                  uuid.UUID  `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
-	Participant1ID      uuid.UUID  `json:"participant1_id" gorm:"type:uuid;not null"`
-	Participant2ID      uuid.UUID  `json:"participant2_id" gorm:"type:uuid;not null"`
-	LastMessageContent  *string    `json:"last_message_content"`
-	LastMessageSenderID *uuid.UUID `json:"last_message_sender_id" gorm:"type:uuid"`
-	LastMessageAt       *time.Time `json:"last_message_at"`
-	UnreadCountP1       int        `json:"unread_count_p1" gorm:"default:0"`
-	UnreadCountP2       int        `json:"unread_count_p2" gorm:"default:0"`
-	P1Typing            bool       `json:"p1_typing" gorm:"default:false"`
-	P2Typing            bool       `json:"p2_typing" gorm:"default:false"`
-	P1TypingAt          *time.Time `json:"p1_typing_at"`
-	P2TypingAt          *time.Time `json:"p2_typing_at"`
-	CreatedAt           time.Time  `json:"created_at" gorm:"default:now()"`
-	UpdatedAt           time.Time  `json:"updated_at" gorm:"default:now()"`
+	ID                   uuid.UUID  `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
+	Participant1ID       uuid.UUID  `json:"participant1_id" gorm:"type:uuid;not null"`
+	Participant2ID       uuid.UUID  `json:"participant2_id" gorm:"type:uuid;not null"`
+	LastMessageContent   *string    `json:"last_message_content"`
+	LastMessageEncrypted *string    `json:"last_message_encrypted"`
+	LastMessageIV        *string    `json:"last_message_iv"`
+	LastMessageSenderID  *uuid.UUID `json:"last_message_sender_id" gorm:"type:uuid"`
+	LastMessageAt        *time.Time `json:"last_message_at"`
+	UnreadCountP1        int        `json:"unread_count_p1" gorm:"default:0"`
+	UnreadCountP2        int        `json:"unread_count_p2" gorm:"default:0"`
+	P1Typing             bool       `json:"p1_typing" gorm:"default:false"`
+	P2Typing             bool       `json:"p2_typing" gorm:"default:false"`
+	P1TypingAt           *time.Time `json:"p1_typing_at"`
+	P2TypingAt           *time.Time `json:"p2_typing_at"`
+	CreatedAt            time.Time  `json:"created_at" gorm:"default:now()"`
+	UpdatedAt            time.Time  `json:"updated_at" gorm:"default:now()"`
 
 	// Joined data (not in database, populated in queries)
 	Participant1 *User `json:"participant1,omitempty" gorm:"foreignKey:Participant1ID"`
@@ -59,17 +61,17 @@ type Conversation struct {
 
 // Message represents a single message in a conversation
 type Message struct {
-	ID             uuid.UUID   `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
-	ConversationID uuid.UUID   `json:"conversation_id" gorm:"type:uuid;not null"`
-	SenderID       uuid.UUID   `json:"sender_id" gorm:"type:uuid;not null"`
-	Content        string      `json:"content" gorm:"not null"` // Plaintext (for backward compatibility, but should be empty if encrypted)
-	EncryptedContent *string   `json:"encrypted_content,omitempty" gorm:"type:text"` // E2EE encrypted content
-	ContentIV      *string     `json:"iv,omitempty" gorm:"column:content_iv;type:text"` // Initialization vector for decryption
-	MessageType    MessageType `json:"message_type" gorm:"default:'text'"`
-	AttachmentURL  *string     `json:"attachment_url"`
-	AttachmentName *string     `json:"attachment_name"`
-	AttachmentSize *int        `json:"attachment_size"`
-	AttachmentType *string     `json:"attachment_type"`
+	ID               uuid.UUID   `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
+	ConversationID   uuid.UUID   `json:"conversation_id" gorm:"type:uuid;not null"`
+	SenderID         uuid.UUID   `json:"sender_id" gorm:"type:uuid;not null"`
+	Content          string      `json:"content" gorm:"not null"`                         // Plaintext (for backward compatibility, but should be empty if encrypted)
+	EncryptedContent *string     `json:"encrypted_content,omitempty" gorm:"type:text"`    // E2EE encrypted content
+	ContentIV        *string     `json:"iv,omitempty" gorm:"column:content_iv;type:text"` // Initialization vector for decryption
+	MessageType      MessageType `json:"message_type" gorm:"default:'text'"`
+	AttachmentURL    *string     `json:"attachment_url"`
+	AttachmentName   *string     `json:"attachment_name"`
+	AttachmentSize   *int        `json:"attachment_size"`
+	AttachmentType   *string     `json:"attachment_type"`
 	// Video-specific fields
 	ThumbnailURL  *string        `json:"thumbnail_url,omitempty"`
 	VideoDuration *int           `json:"video_duration,omitempty"` // Duration in seconds
@@ -178,16 +180,16 @@ type TypingInfo struct {
 
 // MessageRequest represents a request to send a message
 type MessageRequest struct {
-	Content         string      `json:"content"`          // Plaintext (for backward compatibility, empty if encrypted)
-	EncryptedContent *string    `json:"encrypted_content"` // E2EE encrypted content (preferred)
-	IV              *string     `json:"iv"`               // Initialization vector for decryption
-	MessageType     MessageType `json:"message_type"`
-	AttachmentURL   *string     `json:"attachment_url"`
-	AttachmentName  *string     `json:"attachment_name"`
-	AttachmentSize  *int        `json:"attachment_size"`
-	AttachmentType  *string     `json:"attachment_type"`
-	ReplyToID       *uuid.UUID  `json:"reply_to_id"`
-	TempID          *string     `json:"temp_id"` // For optimistic UI tracking
+	Content          string      `json:"content"`           // Plaintext (for backward compatibility, empty if encrypted)
+	EncryptedContent *string     `json:"encrypted_content"` // E2EE encrypted content (preferred)
+	IV               *string     `json:"iv"`                // Initialization vector for decryption
+	MessageType      MessageType `json:"message_type"`
+	AttachmentURL    *string     `json:"attachment_url"`
+	AttachmentName   *string     `json:"attachment_name"`
+	AttachmentSize   *int        `json:"attachment_size"`
+	AttachmentType   *string     `json:"attachment_type"`
+	ReplyToID        *uuid.UUID  `json:"reply_to_id"`
+	TempID           *string     `json:"temp_id"` // For optimistic UI tracking
 }
 
 // ReactionRequest represents a request to add a reaction

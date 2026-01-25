@@ -11,6 +11,7 @@ import '../../../../core/widgets/optimized_cached_image.dart';
 import '../../../../core/utils/date_utils.dart' as app_date;
 import '../../data/models/notification.dart';
 import '../../data/providers/notification_provider.dart';
+import '../../../messages/data/providers/messages_provider.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -64,13 +65,13 @@ class _NotificationsScreenState extends State<NotificationsScreen>
         body: SafeArea(
           child: Column(
             children: [
-              Consumer<NotificationProvider>(
-                builder: (context, provider, _) => AppHeader(
-                onMenuTap: () => _scaffoldKey.currentState?.openDrawer(),
-                  messageBadge: 0, // Message badge handled separately
-                onMessageTap: () {
-                  context.push('/messages');
-                },
+              Consumer2<NotificationProvider, MessagesProvider>(
+                builder: (context, notificationProvider, messagesProvider, _) => AppHeader(
+                  onMenuTap: () => _scaffoldKey.currentState?.openDrawer(),
+                  messageBadge: messagesProvider.totalUnreadCount,
+                  onMessageTap: () {
+                    context.push('/messages');
+                  },
                 ),
               ),
               // Notifications Header - Instagram style
@@ -146,22 +147,25 @@ class _NotificationsScreenState extends State<NotificationsScreen>
             ],
           ),
         ),
-        bottomNavigationBar: AppBottomNavigation(
-          selectedIndex: _selectedBottomNavIndex,
-          onTap: (index) {
-            if (index == 0) {
-              context.go('/home');
-            } else if (index == 1) {
-              context.push('/search');
-            } else if (index == 4) {
-              context.push('/profile');
-            } else {
-              setState(() {
-                _selectedBottomNavIndex = index;
-              });
-            }
-            // Index 3 (Notifications) stays on current screen
-          },
+        bottomNavigationBar: Consumer<NotificationProvider>(
+          builder: (context, notificationProvider, _) => AppBottomNavigation(
+            selectedIndex: _selectedBottomNavIndex,
+            notificationBadge: notificationProvider.unreadCount,
+            onTap: (index) {
+              if (index == 0) {
+                context.go('/home');
+              } else if (index == 1) {
+                context.push('/search');
+              } else if (index == 4) {
+                context.push('/profile');
+              } else {
+                setState(() {
+                  _selectedBottomNavIndex = index;
+                });
+              }
+              // Index 3 (Notifications) stays on current screen
+            },
+          ),
         ),
       ),
     );

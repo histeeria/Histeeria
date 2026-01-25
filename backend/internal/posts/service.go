@@ -9,8 +9,9 @@ import (
 	"histeeria-backend/internal/models"
 	"histeeria-backend/internal/repository"
 
-	"github.com/lib/pq"
 	"histeeria-backend/internal/websocket"
+
+	"github.com/lib/pq"
 
 	"github.com/google/uuid"
 )
@@ -149,6 +150,46 @@ func (s *Service) CreatePost(ctx context.Context, req *models.CreatePostRequest,
 	}
 
 	return post, nil
+}
+
+// GetUserPostsByUsername retrieves posts for a user by their username
+func (s *Service) GetUserPostsByUsername(ctx context.Context, username string, limit, offset int, viewerID uuid.UUID) ([]models.Post, int, error) {
+	fmt.Printf("[Service.GetUserPostsByUsername] Username: %s, Viewer: %s\n", username, viewerID)
+	// 1. Get user by username
+	user, err := s.userRepo.GetUserByUsername(ctx, username)
+	if err != nil {
+		fmt.Printf("[Service.GetUserPostsByUsername] User lookup error: %v\n", err)
+		return nil, 0, fmt.Errorf("user not found: %w", err)
+	}
+	fmt.Printf("[Service.GetUserPostsByUsername] Found user ID: %s\n", user.ID)
+
+	// 2. Get posts for this user
+	posts, total, err := s.postRepo.GetUserPosts(ctx, user.ID, limit, offset)
+	if err != nil {
+		fmt.Printf("[Service.GetUserPostsByUsername] Repo error: %v\n", err)
+		return nil, 0, fmt.Errorf("failed to get user posts: %w", err)
+	}
+	fmt.Printf("[Service.GetUserPostsByUsername] Found %d raw posts (total: %d)\n", len(posts), total)
+
+	// 3. Filter by visibility if viewer is not the owner
+	if viewerID != user.ID {
+		fmt.Printf("[Service.GetUserPostsByUsername] Filtering for public posts (Viewer %s != Owner %s)\n", viewerID, user.ID)
+		filteredPosts := make([]models.Post, 0)
+		for _, post := range posts {
+			// Only show public posts to others
+			// TODO: Handle "connections" visibility once implemented
+			if post.Visibility == "public" {
+				filteredPosts = append(filteredPosts, post)
+			}
+		}
+		fmt.Printf("[Service.GetUserPostsByUsername] %d posts remains after filtering\n", len(filteredPosts))
+		posts = filteredPosts
+		// Note: total count will be slightly inaccurate for non-owners
+	} else {
+		fmt.Println("[Service.GetUserPostsByUsername] No filtering required (Owner is viewer)")
+	}
+
+	return posts, total, nil
 }
 
 // GetPost retrieves a post with all data
@@ -523,17 +564,17 @@ func (s *Service) GetPostInsights(ctx context.Context, postID uuid.UUID) (map[st
 	if err != nil {
 		return nil, fmt.Errorf("failed to get reach: %w", err)
 	}
-	
+
 	impressions, err := s.postRepo.GetPostImpressions(ctx, postID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get impressions: %w", err)
 	}
-	
+
 	profileVisits, err := s.postRepo.GetProfileVisitsFromPost(ctx, postID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get profile visits: %w", err)
 	}
-	
+
 	return map[string]interface{}{
 		"reach":          reach,
 		"impressions":    impressions,

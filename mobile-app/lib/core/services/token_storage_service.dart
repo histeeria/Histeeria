@@ -144,14 +144,22 @@ class TokenStorageService {
   Future<void> setCurrentUserId(String userId) async {
     try {
       await _storage.write(key: currentUserIdKey, value: userId);
-      // Also update the legacy token keys for backward compatibility
+      
+      // Sync the user-specific keys to the main keys for ApiClient
       final token = await getAccessTokenForUser(userId);
       final userData = await getUserDataForUser(userId);
+      
       if (token != null) {
         await _storage.write(key: ApiConfig.accessTokenKey, value: token);
+      } else {
+        // Essential: clear main token if we don't have it for this user
+        await _storage.delete(key: ApiConfig.accessTokenKey);
       }
+      
       if (userData != null) {
         await _storage.write(key: ApiConfig.userDataKey, value: userData);
+      } else {
+        await _storage.delete(key: ApiConfig.userDataKey);
       }
     } catch (e) {
       throw Exception('Failed to set current user ID: $e');

@@ -10,11 +10,13 @@ import 'create_menu_overlay.dart';
 class AppBottomNavigation extends StatefulWidget {
   final int selectedIndex;
   final ValueChanged<int> onTap;
+  final int? notificationBadge;
 
   const AppBottomNavigation({
     super.key,
     required this.selectedIndex,
     required this.onTap,
+    this.notificationBadge,
   });
 
   @override
@@ -106,6 +108,7 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
                   Expanded(
                     child: _NotificationNavItem(
                       isSelected: widget.selectedIndex == 3,
+                      badge: widget.notificationBadge,
                       onTap: () => widget.onTap(3),
                     ),
                   ),

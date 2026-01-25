@@ -122,7 +122,8 @@ class AuthInterceptor extends Interceptor {
       // Public endpoints
       '/search',
       '/hashtags',
-      '/profile/', // Public profile endpoint (GET /profile/:username)
+      '/profile', // Matches /api/v1/profile/:username
+      '/posts/user/', // Matches /api/v1/posts/user/:username
     ];
 
     return publicPaths.any((publicPath) => path.contains(publicPath));

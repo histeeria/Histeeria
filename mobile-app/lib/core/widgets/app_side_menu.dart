@@ -218,7 +218,7 @@ class _AppSideMenuState extends State<AppSideMenu>
                         title: 'Your Activity',
                         onTap: () {
                           _handleClose();
-                          // TODO: Navigate to activity
+                          context.push('/activity');
                         },
                       ),
                       _MenuTile(

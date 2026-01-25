@@ -728,6 +728,10 @@ func main() {
 			presenceGroup.GET("/presence/bulk", messageHandlers.GetBulkPresence)
 		}
 
+		// Profiles & Posts (public with optional auth)
+		api.GET("/profile/:username", auth.OptionalJWTAuthMiddleware(jwtSvc), accountHandlers.GetPublicProfile)
+		api.GET("/posts/user/:username", auth.OptionalJWTAuthMiddleware(jwtSvc), postHandlers.GetUserPosts)
+
 		// Search (public)
 		searchHandlers.SetupRoutes(api)
 
@@ -745,7 +749,6 @@ func main() {
 			postsGroup.DELETE("/:id", postHandlers.DeletePost)
 			postsGroup.POST("/:id/restrict", postHandlers.RestrictPost)
 			postsGroup.DELETE("/:id/restrict", postHandlers.UnrestrictPost)
-			postsGroup.GET("/user/:username", postHandlers.GetUserPosts)
 			postsGroup.GET("/:id/insights", postHandlers.GetPostInsights)
 			postsGroup.POST("/:id/like", postHandlers.LikePost)
 			postsGroup.DELETE("/:id/like", postHandlers.UnlikePost)

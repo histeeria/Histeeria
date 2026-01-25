@@ -74,17 +74,17 @@ func (su *supabaseUser) toUser() (*models.User, error) {
 
 // supabaseMessage is a helper for unmarshaling Message with string timestamps
 type supabaseMessage struct {
-	ID             uuid.UUID          `json:"id"`
-	ConversationID uuid.UUID          `json:"conversation_id"`
-	SenderID       uuid.UUID          `json:"sender_id"`
-	Content        string             `json:"content"`
-	EncryptedContent *string          `json:"encrypted_content"` // E2EE encrypted content
-	ContentIV      *string            `json:"content_iv"`        // Initialization vector for decryption
-	MessageType    models.MessageType `json:"message_type"`
-	AttachmentURL  *string            `json:"attachment_url"`
-	AttachmentName *string            `json:"attachment_name"`
-	AttachmentSize *int               `json:"attachment_size"`
-	AttachmentType *string            `json:"attachment_type"`
+	ID               uuid.UUID          `json:"id"`
+	ConversationID   uuid.UUID          `json:"conversation_id"`
+	SenderID         uuid.UUID          `json:"sender_id"`
+	Content          string             `json:"content"`
+	EncryptedContent *string            `json:"encrypted_content"` // E2EE encrypted content
+	ContentIV        *string            `json:"content_iv"`        // Initialization vector for decryption
+	MessageType      models.MessageType `json:"message_type"`
+	AttachmentURL    *string            `json:"attachment_url"`
+	AttachmentName   *string            `json:"attachment_name"`
+	AttachmentSize   *int               `json:"attachment_size"`
+	AttachmentType   *string            `json:"attachment_type"`
 	// Video-specific fields
 	ThumbnailURL  *string              `json:"thumbnail_url"`
 	VideoDuration *int                 `json:"video_duration"`
@@ -119,17 +119,17 @@ func (sm *supabaseMessage) toMessage() (*models.Message, error) {
 	}
 
 	msg := &models.Message{
-		ID:             sm.ID,
-		ConversationID: sm.ConversationID,
-		SenderID:       sm.SenderID,
-		Content:        sm.Content,
+		ID:               sm.ID,
+		ConversationID:   sm.ConversationID,
+		SenderID:         sm.SenderID,
+		Content:          sm.Content,
 		EncryptedContent: sm.EncryptedContent, // E2EE encrypted content
-		ContentIV:      sm.ContentIV,           // Initialization vector for decryption
-		MessageType:    sm.MessageType,
-		AttachmentURL:  sm.AttachmentURL,
-		AttachmentName: sm.AttachmentName,
-		AttachmentSize: sm.AttachmentSize,
-		AttachmentType: sm.AttachmentType,
+		ContentIV:        sm.ContentIV,        // Initialization vector for decryption
+		MessageType:      sm.MessageType,
+		AttachmentURL:    sm.AttachmentURL,
+		AttachmentName:   sm.AttachmentName,
+		AttachmentSize:   sm.AttachmentSize,
+		AttachmentType:   sm.AttachmentType,
 		// Video-specific fields
 		ThumbnailURL:  sm.ThumbnailURL,
 		VideoDuration: sm.VideoDuration,
@@ -225,22 +225,24 @@ func (sm *supabaseMessage) toMessage() (*models.Message, error) {
 
 // supabaseConversation is a helper struct for unmarshaling Supabase timestamps
 type supabaseConversation struct {
-	ID                  uuid.UUID     `json:"id"`
-	Participant1ID      uuid.UUID     `json:"participant1_id"`
-	Participant2ID      uuid.UUID     `json:"participant2_id"`
-	LastMessageContent  *string       `json:"last_message_content"`
-	LastMessageSenderID *uuid.UUID    `json:"last_message_sender_id"`
-	LastMessageAt       *string       `json:"last_message_at"` // String to handle Supabase format
-	UnreadCountP1       int           `json:"unread_count_p1"`
-	UnreadCountP2       int           `json:"unread_count_p2"`
-	P1Typing            bool          `json:"p1_typing"`
-	P2Typing            bool          `json:"p2_typing"`
-	P1TypingAt          *string       `json:"p1_typing_at"` // String to handle Supabase format
-	P2TypingAt          *string       `json:"p2_typing_at"` // String to handle Supabase format
-	CreatedAt           string        `json:"created_at"`   // String to handle Supabase format
-	UpdatedAt           string        `json:"updated_at"`   // String to handle Supabase format
-	Participant1        *supabaseUser `json:"participant1"`
-	Participant2        *supabaseUser `json:"participant2"`
+	ID                   uuid.UUID     `json:"id"`
+	Participant1ID       uuid.UUID     `json:"participant1_id"`
+	Participant2ID       uuid.UUID     `json:"participant2_id"`
+	LastMessageContent   *string       `json:"last_message_content"`
+	LastMessageEncrypted *string       `json:"last_message_encrypted"`
+	LastMessageIV        *string       `json:"last_message_iv"`
+	LastMessageSenderID  *uuid.UUID    `json:"last_message_sender_id"`
+	LastMessageAt        *string       `json:"last_message_at"` // String to handle Supabase format
+	UnreadCountP1        int           `json:"unread_count_p1"`
+	UnreadCountP2        int           `json:"unread_count_p2"`
+	P1Typing             bool          `json:"p1_typing"`
+	P2Typing             bool          `json:"p2_typing"`
+	P1TypingAt           *string       `json:"p1_typing_at"` // String to handle Supabase format
+	P2TypingAt           *string       `json:"p2_typing_at"` // String to handle Supabase format
+	CreatedAt            string        `json:"created_at"`   // String to handle Supabase format
+	UpdatedAt            string        `json:"updated_at"`   // String to handle Supabase format
+	Participant1         *supabaseUser `json:"participant1"`
+	Participant2         *supabaseUser `json:"participant2"`
 }
 
 // parseSupabaseTime parses Supabase timestamp format (with or without timezone)
@@ -269,15 +271,17 @@ func parseSupabaseTime(s string) (time.Time, error) {
 // toConversation converts supabaseConversation to models.Conversation
 func (sc *supabaseConversation) toConversation() (*models.Conversation, error) {
 	conv := &models.Conversation{
-		ID:                  sc.ID,
-		Participant1ID:      sc.Participant1ID,
-		Participant2ID:      sc.Participant2ID,
-		LastMessageContent:  sc.LastMessageContent,
-		LastMessageSenderID: sc.LastMessageSenderID,
-		UnreadCountP1:       sc.UnreadCountP1,
-		UnreadCountP2:       sc.UnreadCountP2,
-		P1Typing:            sc.P1Typing,
-		P2Typing:            sc.P2Typing,
+		ID:                   sc.ID,
+		Participant1ID:       sc.Participant1ID,
+		Participant2ID:       sc.Participant2ID,
+		LastMessageContent:   sc.LastMessageContent,
+		LastMessageEncrypted: sc.LastMessageEncrypted,
+		LastMessageIV:        sc.LastMessageIV,
+		LastMessageSenderID:  sc.LastMessageSenderID,
+		UnreadCountP1:        sc.UnreadCountP1,
+		UnreadCountP2:        sc.UnreadCountP2,
+		P1Typing:             sc.P1Typing,
+		P2Typing:             sc.P2Typing,
 	}
 
 	// Convert participant users
@@ -681,7 +685,7 @@ func (r *supabaseMessageRepository) GetUnreadCount(ctx context.Context, userID u
 func (r *supabaseMessageRepository) CreateMessage(ctx context.Context, message *models.Message) error {
 	// Determine if message is encrypted
 	isEncrypted := message.EncryptedContent != nil && *message.EncryptedContent != ""
-	
+
 	payload := map[string]interface{}{
 		"conversation_id": message.ConversationID.String(),
 		"sender_id":       message.SenderID.String(),
@@ -1494,7 +1498,7 @@ func (r *supabaseMessageRepository) StoreConversationKey(ctx context.Context, co
 			// Key exists, update it
 			keyID := existing[0]["id"].(string)
 			updateURL := fmt.Sprintf("%s/rest/v1/conversation_keys?id=eq.%s", r.supabaseURL, keyID)
-			
+
 			updateData := map[string]interface{}{
 				"public_key": publicKey,
 				"updated_at": time.Now().Format(time.RFC3339),
@@ -1526,7 +1530,7 @@ func (r *supabaseMessageRepository) StoreConversationKey(ctx context.Context, co
 
 	// Key doesn't exist, create new one
 	createURL := r.conversationKeysURL(nil)
-	
+
 	keyData := map[string]interface{}{
 		"conversation_id": conversationID.String(),
 		"user_id":         userID.String(),
@@ -1608,7 +1612,7 @@ func (r *supabaseMessageRepository) RevokeConversationKey(ctx context.Context, c
 	query.Set("key_version", fmt.Sprintf("eq.%d", keyVersion))
 
 	url := r.conversationKeysURL(query)
-	
+
 	updateData := map[string]interface{}{
 		"revoked_at": time.Now().Format(time.RFC3339),
 	}

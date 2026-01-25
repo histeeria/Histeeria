@@ -1359,11 +1359,7 @@ func (h *AccountHandlers) SetupRoutes(router *gin.RouterGroup) {
 		account.PATCH("/achievements/:id", h.UpdateAchievement)
 		account.DELETE("/achievements/:id", h.DeleteAchievement)
 
-		// Companies
 		account.GET("/companies/search", h.SearchCompanies)
 		account.POST("/companies", h.CreateCompany)
 	}
-
-	// Public profile endpoint (no auth required, but optional auth for privacy checks)
-	router.GET("/profile/:username", h.GetPublicProfile)
 }

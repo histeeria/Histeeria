@@ -126,28 +126,18 @@ func (s *RelationshipService) FollowUser(ctx context.Context, fromUserID, toUser
 	}
 	fmt.Printf("[RelationshipService] Relationship created successfully\n")
 
-	// Record the action for rate limiting
-	if err := s.recordAction(ctx, fromUserID, "follow"); err != nil {
-		fmt.Printf("[RelationshipService] recordAction failed: %v\n", err)
-		return nil, err
-	}
-
-	// Update follower counts
-	fmt.Printf("[RelationshipService] Updating follower counts\n")
-	if err := s.updateFollowerCounts(ctx, fromUserID, toUserID, true); err != nil {
-		// Log error but don't fail the operation (relationship still created)
-		fmt.Printf("[RelationshipService] FAILED to update follower counts: %v\n", err)
-	} else {
-		fmt.Printf("[RelationshipService] Follower counts updated successfully\n")
-	}
-
-	// Send follow notification
-	if s.notificationService != nil {
-		fromUser, err := s.userRepo.GetUserByID(ctx, fromUserID)
-		if err == nil {
-			_ = s.notificationService.CreateFollowNotification(ctx, fromUserID, toUserID, fromUser.Username)
+	// Perform non-critical operations asynchronously to speed up response
+	go func() {
+		bgCtx := context.Background()
+		_ = s.recordAction(bgCtx, fromUserID, "follow")
+		_ = s.updateFollowerCounts(bgCtx, fromUserID, toUserID, true)
+		if s.notificationService != nil {
+			fromUser, err := s.userRepo.GetUserByID(bgCtx, fromUserID)
+			if err == nil {
+				_ = s.notificationService.CreateFollowNotification(bgCtx, fromUserID, toUserID, fromUser.Username)
+			}
 		}
-	}
+	}()
 
 	fmt.Printf("[RelationshipService] Follow completed successfully\n")
 

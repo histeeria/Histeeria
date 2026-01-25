@@ -146,7 +146,7 @@ func (r *SupabaseNotificationRepository) GetByID(ctx context.Context, id uuid.UU
 	q := url.Values{}
 	q.Set("id", "eq."+id.String())
 	q.Set("user_id", "eq."+userID.String())
-	q.Set("select", "*,actor:users!actor_id(id,username,display_name,profile_picture,is_verified)")
+	q.Set("select", "*,actor:actor_id(id,username,display_name,profile_picture,is_verified)")
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, r.notificationsURL(q), nil)
 	if err != nil {

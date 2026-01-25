@@ -68,13 +68,27 @@ class _AudioMessageBubbleState extends State<AudioMessageBubble> {
     // Generate placeholder waveform immediately
     _generatePlaceholderWaveform();
 
-    // Check if file is already downloaded
-    final isDownloaded = await _fileStorage.isFileDownloaded(widget.messageId);
+    // Check if file is already downloaded (with .m4a extension)
+    const audioExt = 'm4a';
+    bool isDownloaded = await _fileStorage.isFileDownloaded(widget.messageId, extension: audioExt);
+    
     if (isDownloaded) {
-      final file = await _fileStorage.getDownloadedFile(widget.messageId);
+      final file = await _fileStorage.getDownloadedFile(widget.messageId, extension: audioExt);
       if (file != null && await file.exists()) {
         setState(() {
           _localFilePath = file.path;
+        });
+        await _loadDuration();
+        await _generateWaveform();
+        return;
+      }
+    } else {
+      // Fallback: Check if extensionless file exists (backward compatibility)
+      final legacyFile = await _fileStorage.getDownloadedFile(widget.messageId); // no extension
+      if (legacyFile != null && await legacyFile.exists()) {
+        print('[AudioMessageBubble] Found legacy extensionless file, using as fallback');
+        setState(() {
+          _localFilePath = legacyFile.path;
         });
         await _loadDuration();
         await _generateWaveform();
@@ -149,6 +163,7 @@ class _AudioMessageBubbleState extends State<AudioMessageBubble> {
         final file = await _fileStorage.downloadFile(
           widget.messageId,
           signedUrl,
+          extension: 'm4a',
           onProgress: (received, total) {
             // Could show download progress if needed
           },

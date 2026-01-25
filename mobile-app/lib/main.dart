@@ -14,6 +14,7 @@ import 'features/profile/data/providers/public_profile_provider.dart';
 import 'features/posts/data/providers/posts_provider.dart';
 import 'features/feed/data/providers/feed_provider.dart';
 import 'features/notifications/data/providers/notification_provider.dart';
+import 'features/messages/data/providers/messages_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -60,16 +61,12 @@ void main() async {
   }
   
   // Fetch Supabase storage URL from backend (non-blocking)
-  try {
-    await ApiConfig.fetchStorageUrl().timeout(
-      const Duration(seconds: 3),
-      onTimeout: () {
-        AppLogger.warning('Storage URL fetch timed out, will retry on-demand', 'Main');
-      },
-    );
-  } catch (e) {
-    AppLogger.warning('Failed to fetch storage URL: $e', 'Main');
-  }
+  ApiConfig.fetchStorageUrl().timeout(
+    const Duration(milliseconds: 500),
+    onTimeout: () {
+      // Shhh... let the app start
+    },
+  ).catchError((_) {});
   
   AppLogger.success('App initialization complete', 'Main');
   runApp(const MyApp());
@@ -89,6 +86,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => PostsProvider()),
         ChangeNotifierProvider(create: (_) => FeedProvider()),
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
+        ChangeNotifierProvider(create: (_) => MessagesProvider()),
       ],
       child: MaterialApp.router(
         title: 'Histeeria',

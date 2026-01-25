@@ -25,6 +25,7 @@ import '../../features/notifications/presentation/screens/notifications_screen.d
 import '../../features/search/presentation/screens/functional_search_screen.dart';
 import '../../features/feed/presentation/screens/explore_screen.dart';
 // import '../../features/jobs/presentation/screens/jobs_screen.dart'; // TODO: Create JobsScreen
+import '../../features/activity/presentation/screens/your_activity_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/settings/presentation/screens/account_settings_screen.dart';
 import '../../features/settings/presentation/screens/personal_info/change_email_screen.dart';
@@ -194,6 +195,7 @@ final appRouter = GoRouter(
       builder: (context, state) => const AddAccountScreen(),
     ),
     GoRoute(path: '/home', builder: (context, state) => const HomeScreen()),
+    GoRoute(path: '/activity', builder: (context, state) => const YourActivityScreen()),
     GoRoute(
       path: '/explore',
       builder: (context, state) {
@@ -272,6 +274,7 @@ final appRouter = GoRouter(
             userId: userId,
             userName: extra['userName'] as String? ?? 'User',
             userUsername: extra['userUsername'] as String? ?? '@user',
+            profilePicture: extra['profilePicture'] as String?,
             isOnline: extra['isOnline'] as bool? ?? false,
           ),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
