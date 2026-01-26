@@ -11,16 +11,28 @@ const getBackendUrl = () => {
     console.log('[Proxy] Development mode detected - using localhost:8081');
     return 'http://127.0.0.1:8081';
   }
-  
+
   // Production: use environment variable if set
   const envUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
   if (envUrl) {
-    // Replace localhost with 127.0.0.1 for better server-side connectivity
-    const url = envUrl.replace('localhost', '127.0.0.1');
-    console.log('[Proxy] Production mode - using:', url);
+    // URL normalization: Remove trailing /api/v1, /api, or /v1
+    // This prevents duplication since the proxy manually adds /api/ and the path includes v1
+    let url = envUrl;
+
+    // Remove trailing slashes first
+    url = url.replace(/\/+$/, '');
+
+    // Remove known suffixes to get the true root domain
+    if (url.endsWith('/api/v1')) {
+      url = url.substring(0, url.length - '/api/v1'.length);
+    } else if (url.endsWith('/api')) {
+      url = url.substring(0, url.length - '/api'.length);
+    }
+
+    console.log('[Proxy] Production mode - formatted root URL:', url);
     return url;
   }
-  
+
   // Fallback to localhost (shouldn't happen in production)
   console.log('[Proxy] No API_BASE_URL set - using localhost:8081');
   return 'http://127.0.0.1:8081';
@@ -48,7 +60,7 @@ export async function POST(
     console.log('[Proxy Route] Resolved params:', resolvedParams);
     const path = resolvedParams.path;
     console.log('[Proxy Route] POST called with path:', path);
-    
+
     if (!path || path.length === 0) {
       console.error('[Proxy Route] No path in params');
       return NextResponse.json(
@@ -56,13 +68,13 @@ export async function POST(
         { status: 400 }
       );
     }
-    
+
     return proxyRequest(request, path, 'POST');
   } catch (error) {
     console.error('[Proxy Route] POST handler error:', error);
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         message: 'Route handler error',
         error: error instanceof Error ? error.message : 'Unknown error'
       },
@@ -107,7 +119,7 @@ async function proxyRequest(
   console.log(`[Proxy] ${method} request received`);
   console.log(`[Proxy] Path segments:`, pathSegments);
   console.log(`[Proxy] Request URL:`, request.url);
-  
+
   try {
     // Validate path segments
     if (!pathSegments || pathSegments.length === 0) {
@@ -121,10 +133,10 @@ async function proxyRequest(
     const path = pathSegments.join('/');
     const url = new URL(request.url);
     const queryString = url.searchParams.toString();
-    
+
     // Construct backend URL: /api/v1/... (path already includes 'v1')
     const backendUrl = `${BACKEND_URL}/api/${path}${queryString ? `?${queryString}` : ''}`;
-    
+
     // Check content type to determine how to handle the body
     const contentType = request.headers.get('content-type');
     const isFormData = contentType?.includes('multipart/form-data');
@@ -138,7 +150,7 @@ async function proxyRequest(
 
     // Get request body if present (for POST, PUT, PATCH)
     let body: any = null;
-    
+
     if (method !== 'GET' && method !== 'DELETE') {
       try {
         if (isFormData) {
@@ -161,12 +173,12 @@ async function proxyRequest(
     // Forward headers (excluding browser-specific headers)
     // Since this is a server-to-server request, we don't want to forward Origin, Referer, etc.
     const headers: HeadersInit = {};
-    
+
     // Only set Content-Type for JSON requests (NOT for FormData - fetch will set it automatically with boundary)
     if (method !== 'GET' && method !== 'DELETE' && body && !isFormData) {
       headers['Content-Type'] = 'application/json';
     }
-    
+
     // Log body info for debugging
     if (process.env.NODE_ENV === 'development' && body) {
       if (typeof body === 'string') {
@@ -181,7 +193,7 @@ async function proxyRequest(
         console.log('[Proxy] Body type:', typeof body, 'isFormData:', isFormData);
       }
     }
-    
+
     // Only forward specific headers we need (no browser headers like Origin, Referer)
     const forwardedHeaders = ['authorization'];
     request.headers.forEach((value, key) => {
@@ -197,7 +209,7 @@ async function proxyRequest(
       ) {
         return; // Skip these headers
       }
-      
+
       if (
         forwardedHeaders.includes(lowerKey) ||
         (lowerKey.startsWith('x-') && lowerKey !== 'x-forwarded-host')
@@ -210,7 +222,7 @@ async function proxyRequest(
         }
       }
     });
-    
+
     // Always log in development for debugging
     console.log(`[Proxy] Headers being sent:`, Object.keys(headers));
     console.log(`[Proxy] Has Authorization header:`, !!headers['Authorization'] || !!headers['authorization']);
@@ -223,7 +235,7 @@ async function proxyRequest(
     // Create abort controller for timeout (30 seconds)
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
-    
+
     // Use fetch with explicit configuration for Next.js server-side
     const fetchOptions: RequestInit = {
       method,
@@ -234,7 +246,7 @@ async function proxyRequest(
       cache: 'no-store',
       signal: controller.signal,
     };
-    
+
     let response: Response;
     try {
       if (process.env.NODE_ENV === 'development') {
@@ -245,23 +257,23 @@ async function proxyRequest(
           headers: Object.keys(headers),
         });
       }
-      
+
       response = await fetch(backendUrl, fetchOptions);
       clearTimeout(timeoutId);
     } catch (fetchError) {
       clearTimeout(timeoutId);
       const errorMsg = fetchError instanceof Error ? fetchError.message : 'Unknown fetch error';
       console.error('[Proxy] Fetch error:', errorMsg);
-      
+
       if (fetchError instanceof Error && fetchError.name === 'AbortError') {
         throw new Error('Request timeout - backend server did not respond within 30 seconds');
       }
-      
+
       // Provide more context about the error
       if (errorMsg.includes('ECONNREFUSED') || errorMsg.includes('fetch failed')) {
         throw new Error(`Failed to connect to backend at ${backendUrl}. Is the backend running?`);
       }
-      
+
       throw fetchError;
     }
 
@@ -301,7 +313,7 @@ async function proxyRequest(
       'Pragma': 'no-cache',
       'Expires': '0',
     };
-    
+
     // Forward X-New-Token for sliding window authentication
     const newToken = response.headers.get('X-New-Token');
     if (newToken) {
@@ -315,13 +327,13 @@ async function proxyRequest(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     const errorStack = error instanceof Error ? error.stack : undefined;
-    
+
     // Reconstruct backendUrl for error reporting (in case it failed before assignment)
     const path = pathSegments?.join('/') || 'unknown';
     const url = new URL(request.url);
     const queryString = url.searchParams.toString();
     const attemptedUrl = `${BACKEND_URL}/api/${path}${queryString ? `?${queryString}` : ''}`;
-    
+
     // Always log errors for debugging
     console.error('[Proxy] Error details:');
     console.error('  Message:', errorMessage);
@@ -332,7 +344,7 @@ async function proxyRequest(
     if (process.env.NODE_ENV === 'development') {
       console.error('  Stack:', errorStack);
     }
-    
+
     // Check if it's a timeout error
     if (errorMessage.includes('timeout') || errorMessage.includes('aborted')) {
       // SECURITY: Don't expose internal URLs in production
@@ -351,7 +363,7 @@ async function proxyRequest(
         { status: 504 }
       );
     }
-    
+
     // Check if it's a connection error
     if (errorMessage.includes('ECONNREFUSED') || errorMessage.includes('fetch failed')) {
       // SECURITY: Don't expose internal URLs in production
@@ -370,7 +382,7 @@ async function proxyRequest(
         { status: 502 }
       );
     }
-    
+
     // Generic error
     const isDevelopment = process.env.NODE_ENV === 'development';
     return NextResponse.json(
