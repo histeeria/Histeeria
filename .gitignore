@@ -27,11 +27,11 @@ config/keys/
 *.sqlite
 *.sqlite3
 data/
-storage/
+data/
 uploads/
 
 # Authentication and Tokens
-auth/
+# Authentication and Tokens
 tokens/
 jwt/
 oauth/
