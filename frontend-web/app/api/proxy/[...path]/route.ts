@@ -347,18 +347,14 @@ async function proxyRequest(
 
     // Check if it's a timeout error
     if (errorMessage.includes('timeout') || errorMessage.includes('aborted')) {
-      // SECURITY: Don't expose internal URLs in production
-      const isDevelopment = process.env.NODE_ENV === 'development';
       return NextResponse.json(
         {
           success: false,
           message: 'Request timeout - the server may be slow or unresponsive',
-          ...(isDevelopment && {
-            error: errorMessage,
-            backend_url: BACKEND_URL,
-            attempted_url: attemptedUrl,
-            hint: `Backend at ${BACKEND_URL} did not respond within 30 seconds.`,
-          }),
+          error: errorMessage,
+          backend_url: BACKEND_URL,
+          attempted_url: attemptedUrl,
+          hint: `Backend at ${BACKEND_URL} did not respond within 30 seconds.`,
         },
         { status: 504 }
       );
@@ -366,34 +362,28 @@ async function proxyRequest(
 
     // Check if it's a connection error
     if (errorMessage.includes('ECONNREFUSED') || errorMessage.includes('fetch failed')) {
-      // SECURITY: Don't expose internal URLs in production
-      const isDevelopment = process.env.NODE_ENV === 'development';
       return NextResponse.json(
         {
           success: false,
           message: 'Failed to connect to backend server',
-          ...(isDevelopment && {
-            error: errorMessage,
-            backend_url: BACKEND_URL,
-            attempted_url: attemptedUrl,
-            hint: `Backend should be running. Check: 1) Backend is running, 2) Port matches, 3) No firewall blocking`,
-          }),
+          error: errorMessage,
+          backend_url: BACKEND_URL,
+          attempted_url: attemptedUrl,
+          hint: `Backend should be running. Check provided URL.`,
         },
         { status: 502 }
       );
     }
 
     // Generic error
-    const isDevelopment = process.env.NODE_ENV === 'development';
     return NextResponse.json(
       {
         success: false,
         message: 'Proxy request failed',
-        ...(isDevelopment && {
-          error: errorMessage,
-          backend_url: BACKEND_URL,
-          attempted_url: attemptedUrl,
-        }),
+        error: errorMessage,
+        backend_url: BACKEND_URL,
+        attempted_url: attemptedUrl,
+        stack: errorStack
       },
       { status: 500 }
     );
