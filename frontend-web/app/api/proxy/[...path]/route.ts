@@ -22,6 +22,11 @@ const getBackendUrl = () => {
     // Remove trailing slashes first
     url = url.replace(/\/+$/, '');
 
+    // Ensure protocol is present
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = `https://${url}`;
+    }
+
     // Remove known suffixes to get the true root domain
     if (url.endsWith('/api/v1')) {
       url = url.substring(0, url.length - '/api/v1'.length);
