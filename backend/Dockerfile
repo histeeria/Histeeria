@@ -23,6 +23,10 @@ RUN go mod download && go mod verify
 # Copy source code
 COPY . .
 
+# DEBUG: List files to ensure internal directories are copied
+RUN ls -la /app/internal/auth /app/internal/storage || echo "Directories missing"
+RUN go env
+
 # Build with optimizations
 # -ldflags="-s -w" strips debug symbols for smaller binary
 # CGO_ENABLED=0 for static binary
