@@ -57,7 +57,7 @@ class YourActivityScreen extends StatelessWidget {
                       title: 'Liked Posts',
                       subtitle: 'Posts you\'ve liked',
                       onTap: () {
-                        // TODO: Navigate to liked posts
+                        context.push('/activity/liked');
                       },
                     ),
                     _ActivityItem(
@@ -65,7 +65,7 @@ class YourActivityScreen extends StatelessWidget {
                       title: 'Your Comments',
                       subtitle: 'Comments you\'ve made',
                       onTap: () {
-                        // TODO: Navigate to comments
+                        context.push('/activity/comments'); // Changed logic to navigate
                       },
                     ),
                     _ActivityItem(
@@ -73,7 +73,7 @@ class YourActivityScreen extends StatelessWidget {
                       title: 'Shares',
                       subtitle: 'Posts you\'ve shared',
                       onTap: () {
-                        // TODO: Navigate to shares
+                        context.push('/activity/shared'); // Changed logic to navigate
                       },
                     ),
                     const SizedBox(height: 16),
@@ -85,7 +85,7 @@ class YourActivityScreen extends StatelessWidget {
                       title: 'Archived',
                       subtitle: 'Posts you\'ve archived',
                       onTap: () {
-                        // TODO: Navigate to archived
+                        context.push('/activity/archived');
                       },
                     ),
                     _ActivityItem(
@@ -93,7 +93,7 @@ class YourActivityScreen extends StatelessWidget {
                       title: 'Recently Deleted',
                       subtitle: 'Content you\'ve deleted recently',
                       onTap: () {
-                        // TODO: Navigate to recently deleted
+                        context.push('/activity/deleted');
                       },
                     ),
                     const SizedBox(height: 16),
@@ -105,7 +105,7 @@ class YourActivityScreen extends StatelessWidget {
                       title: 'Recent Searches',
                       subtitle: 'Your search history',
                       onTap: () {
-                        // TODO: Navigate to search history
+                        context.push('/activity/history');
                       },
                     ),
                     _ActivityItem(

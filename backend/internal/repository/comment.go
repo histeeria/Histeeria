@@ -22,4 +22,7 @@ type CommentRepository interface {
 	UnlikeComment(ctx context.Context, commentID, userID uuid.UUID) error
 	IsCommentLikedByUser(ctx context.Context, commentID, userID uuid.UUID) (bool, error)
 	GetCommentLikes(ctx context.Context, commentID uuid.UUID, limit, offset int) ([]models.User, int, error)
+
+	// User activity
+	GetUserComments(ctx context.Context, userID uuid.UUID, limit, offset int) ([]models.Comment, int, error)
 }

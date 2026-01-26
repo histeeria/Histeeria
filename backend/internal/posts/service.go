@@ -548,6 +548,11 @@ func (s *Service) GetUserCommentedPosts(ctx context.Context, userID uuid.UUID, l
 	return s.postRepo.GetUserCommentedPosts(ctx, userID, limit, offset)
 }
 
+// GetUserComments retrieves a user's comment history
+func (s *Service) GetUserComments(ctx context.Context, userID uuid.UUID, limit, offset int) ([]models.Comment, int, error) {
+	return s.commentRepo.GetUserComments(ctx, userID, limit, offset)
+}
+
 // GetUserDeletedPosts retrieves all posts that a user has deleted (within last 30 days)
 func (s *Service) GetUserDeletedPosts(ctx context.Context, userID uuid.UUID, limit, offset int) ([]models.Post, int, error) {
 	return s.postRepo.GetUserDeletedPosts(ctx, userID, limit, offset)

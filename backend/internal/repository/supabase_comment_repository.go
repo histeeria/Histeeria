@@ -86,7 +86,7 @@ func (r *SupabaseCommentRepository) parseCommentFromMap(commentData map[string]i
 
 	// Parse UUIDs - these are required
 	var hasValidID, hasValidPostID, hasValidUserID bool
-	
+
 	if id, ok := commentData["id"].(string); ok && id != "" {
 		if parsedUUID, err := uuid.Parse(id); err == nil {
 			comment.ID = parsedUUID
@@ -206,7 +206,7 @@ func (r *SupabaseCommentRepository) CreateComment(ctx context.Context, comment *
 		"parent_comment_id": comment.ParentCommentID,
 		"content":           comment.Content,
 	}
-	
+
 	// Only include media fields if they have values (database constraint requires NULL or valid values)
 	if comment.MediaURL != "" {
 		payload["media_url"] = comment.MediaURL
@@ -457,6 +457,74 @@ func (r *SupabaseCommentRepository) IsCommentLikedByUser(ctx context.Context, co
 func (r *SupabaseCommentRepository) GetCommentLikes(ctx context.Context, commentID uuid.UUID, limit, offset int) ([]models.User, int, error) {
 	// Would require join or RPC
 	return []models.User{}, 0, nil
+}
+
+// GetUserComments retrieves comments made by a specific user
+func (r *SupabaseCommentRepository) GetUserComments(ctx context.Context, userID uuid.UUID, limit, offset int) ([]models.Comment, int, error) {
+	query := fmt.Sprintf(
+		"?user_id=eq.%s&deleted_at=is.null&select=*&order=created_at.desc&limit=%d&offset=%d",
+		userID.String(), limit, offset,
+	)
+
+	// Make request and get response with headers
+	url := fmt.Sprintf("%s/rest/v1/post_comments%s", r.SupabasePostRepository.supabaseURL, query)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("apikey", r.SupabasePostRepository.serviceKey)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", r.SupabasePostRepository.serviceKey))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Prefer", "count=exact")
+
+	resp, err := r.SupabasePostRepository.client.Do(req)
+	if err != nil {
+		log.Printf("[CommentRepo] Error making request: %v", err)
+		return nil, 0, fmt.Errorf("failed to get user comments: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		log.Printf("[CommentRepo] Supabase error (status %d): %s", resp.StatusCode, string(bodyBytes))
+		return nil, 0, fmt.Errorf("supabase error (status %d): %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	// Parse total count
+	totalCount := 0
+	if contentRange := resp.Header.Get("Content-Range"); contentRange != "" {
+		var start, end, total int
+		if n, _ := fmt.Sscanf(contentRange, "%d-%d/%d", &start, &end, &total); n == 3 {
+			totalCount = total
+		} else if n, _ := fmt.Sscanf(contentRange, "*/%d", &total); n == 1 {
+			totalCount = total
+		}
+	}
+
+	if len(data) == 0 || string(data) == "[]" {
+		return []models.Comment{}, totalCount, nil
+	}
+
+	comments, err := r.parseCommentsFromJSON(data)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to parse comments: %w", err)
+	}
+
+	for i := range comments {
+		r.loadCommentAuthor(ctx, &comments[i])
+	}
+
+	if totalCount == 0 {
+		totalCount = len(comments)
+	}
+
+	return comments, totalCount, nil
 }
 
 // loadCommentAuthor loads the author for a comment

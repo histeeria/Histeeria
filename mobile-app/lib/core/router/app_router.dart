@@ -25,7 +25,14 @@ import '../../features/notifications/presentation/screens/notifications_screen.d
 import '../../features/search/presentation/screens/functional_search_screen.dart';
 import '../../features/feed/presentation/screens/explore_screen.dart';
 // import '../../features/jobs/presentation/screens/jobs_screen.dart'; // TODO: Create JobsScreen
+// import '../../features/jobs/presentation/screens/jobs_screen.dart'; // TODO: Create JobsScreen
 import '../../features/activity/presentation/screens/your_activity_screen.dart';
+import '../../features/activity/presentation/screens/liked_posts_screen.dart';
+import '../../features/activity/presentation/screens/comments_screen.dart';
+import '../../features/activity/presentation/screens/shared_posts_screen.dart';
+import '../../features/activity/presentation/screens/archived_screen.dart';
+import '../../features/activity/presentation/screens/recently_deleted_screen.dart';
+import '../../features/activity/presentation/screens/search_history_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/settings/presentation/screens/account_settings_screen.dart';
 import '../../features/settings/presentation/screens/personal_info/change_email_screen.dart';
@@ -196,6 +203,12 @@ final appRouter = GoRouter(
     ),
     GoRoute(path: '/home', builder: (context, state) => const HomeScreen()),
     GoRoute(path: '/activity', builder: (context, state) => const YourActivityScreen()),
+    GoRoute(path: '/activity/liked', builder: (context, state) => const LikedPostsScreen()),
+    GoRoute(path: '/activity/comments', builder: (context, state) => const CommentsScreen()),
+    GoRoute(path: '/activity/shared', builder: (context, state) => const SharedPostsScreen()),
+    GoRoute(path: '/activity/archived', builder: (context, state) => const ArchivedScreen()),
+    GoRoute(path: '/activity/deleted', builder: (context, state) => const RecentlyDeletedScreen()),
+    GoRoute(path: '/activity/history', builder: (context, state) => const SearchHistoryScreen()),
     GoRoute(
       path: '/explore',
       builder: (context, state) {

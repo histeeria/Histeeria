@@ -782,6 +782,9 @@ func main() {
 			activityGroup.GET("/interactions", postHandlers.GetUserInteractions)
 			activityGroup.GET("/archived", postHandlers.GetUserArchived)
 			activityGroup.GET("/shared", postHandlers.GetUserShared)
+			activityGroup.GET("/liked", postHandlers.GetUserLikedPosts)
+			activityGroup.GET("/comments", postHandlers.GetUserComments)
+			activityGroup.GET("/searches", postHandlers.GetUserSearchHistory)
 		}
 
 		hashtagGroup := api.Group("/hashtags")
