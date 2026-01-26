@@ -23,8 +23,8 @@ RUN go mod download && go mod verify
 # Copy source code
 COPY . .
 
-# DEBUG: List files to ensure internal directories are copied
-RUN ls -la /app/internal/auth /app/internal/storage || echo "Directories missing"
+# DEBUG: List all files in internal to debug missing directories
+RUN ls -R /app/internal || echo "Internal directory listing failed"
 RUN go env
 
 # Build with optimizations
