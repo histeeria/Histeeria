@@ -6,11 +6,11 @@ import Image from 'next/image';
 import { AuthErrorBoundary } from '@/components/auth/AuthErrorBoundary';
 import { AuthSkeleton } from '@/components/auth/AuthSkeleton';
 import { SessionExpiryWarning } from '@/components/auth/SessionExpiryWarning';
-import { 
-  validateSignInForm, 
-  validateSignUpForm, 
+import {
+  validateSignInForm,
+  validateSignUpForm,
   getFieldError,
-  type ValidationError 
+  type ValidationError
 } from '@/lib/auth/formValidation';
 import { storeToken } from '@/lib/auth/tokenManager';
 
@@ -64,17 +64,17 @@ function AuthPageContent() {
   const handleSignInChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const field = e.target.name;
     const value = e.target.value;
-    
+
     setSignInForm({
       ...signInForm,
       [field]: value,
     });
-    
+
     // Clear validation error for this field when user types
     if (validationErrors.length > 0) {
       setValidationErrors(prev => prev.filter(err => err.field !== field));
     }
-    
+
     // Mark field as touched
     setTouchedFields(prev => new Set(prev).add(field));
   };
@@ -82,7 +82,7 @@ function AuthPageContent() {
   const handleSignUpChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const field = e.target.name;
     let value: string | number;
-    
+
     if (e.target.type === 'number') {
       const numValue = parseInt(e.target.value, 10);
       // Handle NaN - use empty string or keep current value
@@ -90,17 +90,17 @@ function AuthPageContent() {
     } else {
       value = e.target.value;
     }
-    
+
     setSignUpForm({
       ...signUpForm,
       [field]: value,
     });
-    
+
     // Clear validation error for this field when user types
     if (validationErrors.length > 0) {
       setValidationErrors(prev => prev.filter(err => err.field !== field));
     }
-    
+
     // Mark field as touched
     setTouchedFields(prev => new Set(prev).add(field));
   };
@@ -154,7 +154,7 @@ function AuthPageContent() {
         setError(data.message || 'Login failed');
       }
     } catch (err) {
-      const errorMessage = err instanceof Error 
+      const errorMessage = err instanceof Error
         ? `Connection error: ${err.message}. Make sure backend is running on ${API_BASE_URL}`
         : `Failed to connect to server. Please check if backend is running on ${API_BASE_URL}`;
       setError(errorMessage);
@@ -178,7 +178,7 @@ function AuthPageContent() {
           sessionStorage.setItem('oauth_state', data.state);
           sessionStorage.setItem('oauth_provider', provider);
         }
-        
+
         // Redirect to OAuth provider
         window.location.href = data.auth_url;
       } else {
@@ -239,7 +239,7 @@ function AuthPageContent() {
         setError(data.message || data.error || 'Registration failed');
       }
     } catch (err) {
-      const errorMessage = err instanceof Error 
+      const errorMessage = err instanceof Error
         ? `Connection error: ${err.message}. Make sure backend is running on ${API_BASE_URL}`
         : `Failed to connect to server. Please check if backend is running on ${API_BASE_URL}`;
       setError(errorMessage);
@@ -299,11 +299,10 @@ function AuthPageContent() {
                 required
                 value={signUpForm.email}
                 onChange={handleSignUpChange}
-                className={`peer w-full rounded-2xl border-2 px-5 py-4 text-base text-gray-900 transition-all focus:outline-none ${
-                  getFieldError(validationErrors, 'email') && touchedFields.has('email')
+                className={`peer w-full rounded-2xl border-2 px-5 py-4 text-base text-gray-900 transition-all focus:outline-none ${getFieldError(validationErrors, 'email') && touchedFields.has('email')
                     ? 'border-red-500 focus:border-red-600'
                     : 'border-blue-500 focus:border-blue-600'
-                }`}
+                  }`}
                 aria-invalid={!!getFieldError(validationErrors, 'email')}
                 aria-describedby={getFieldError(validationErrors, 'email') ? 'email-error' : undefined}
               />
@@ -329,11 +328,10 @@ function AuthPageContent() {
                 pattern="[a-zA-Z0-9_]+"
                 value={signUpForm.username}
                 onChange={handleSignUpChange}
-                className={`peer w-full rounded-2xl border-2 px-5 py-4 text-base text-gray-900 transition-all focus:outline-none ${
-                  getFieldError(validationErrors, 'username') && touchedFields.has('username')
+                className={`peer w-full rounded-2xl border-2 px-5 py-4 text-base text-gray-900 transition-all focus:outline-none ${getFieldError(validationErrors, 'username') && touchedFields.has('username')
                     ? 'border-red-500 focus:border-red-600'
                     : 'border-blue-500 focus:border-blue-600'
-                }`}
+                  }`}
                 aria-invalid={!!getFieldError(validationErrors, 'username')}
                 aria-describedby={getFieldError(validationErrors, 'username') ? 'username-error' : undefined}
               />
@@ -358,11 +356,10 @@ function AuthPageContent() {
                 maxLength={50}
                 value={signUpForm.display_name}
                 onChange={handleSignUpChange}
-                className={`peer w-full rounded-2xl border-2 px-5 py-4 text-base text-gray-900 transition-all focus:outline-none ${
-                  getFieldError(validationErrors, 'display_name') && touchedFields.has('display_name')
+                className={`peer w-full rounded-2xl border-2 px-5 py-4 text-base text-gray-900 transition-all focus:outline-none ${getFieldError(validationErrors, 'display_name') && touchedFields.has('display_name')
                     ? 'border-red-500 focus:border-red-600'
                     : 'border-blue-500 focus:border-blue-600'
-                }`}
+                  }`}
                 aria-invalid={!!getFieldError(validationErrors, 'display_name')}
                 aria-describedby={getFieldError(validationErrors, 'display_name') ? 'display_name-error' : undefined}
               />
@@ -387,11 +384,10 @@ function AuthPageContent() {
                 max={120}
                 value={isNaN(signUpForm.age) ? 18 : signUpForm.age}
                 onChange={handleSignUpChange}
-                className={`peer w-full rounded-2xl border-2 px-5 py-4 text-base text-gray-900 transition-all focus:outline-none ${
-                  getFieldError(validationErrors, 'age') && touchedFields.has('age')
+                className={`peer w-full rounded-2xl border-2 px-5 py-4 text-base text-gray-900 transition-all focus:outline-none ${getFieldError(validationErrors, 'age') && touchedFields.has('age')
                     ? 'border-red-500 focus:border-red-600'
                     : 'border-blue-500 focus:border-blue-600'
-                }`}
+                  }`}
                 aria-invalid={!!getFieldError(validationErrors, 'age')}
                 aria-describedby={getFieldError(validationErrors, 'age') ? 'age-error' : undefined}
               />
@@ -415,11 +411,10 @@ function AuthPageContent() {
                 minLength={8}
                 value={signUpForm.password}
                 onChange={handleSignUpChange}
-                className={`peer w-full rounded-2xl border-2 px-5 py-4 pr-12 text-base text-gray-900 transition-all focus:outline-none ${
-                  getFieldError(validationErrors, 'password') && touchedFields.has('password')
+                className={`peer w-full rounded-2xl border-2 px-5 py-4 pr-12 text-base text-gray-900 transition-all focus:outline-none ${getFieldError(validationErrors, 'password') && touchedFields.has('password')
                     ? 'border-red-500 focus:border-red-600'
                     : 'border-blue-500 focus:border-blue-600'
-                }`}
+                  }`}
                 aria-invalid={!!getFieldError(validationErrors, 'password')}
                 aria-describedby={getFieldError(validationErrors, 'password') ? 'password-error' : undefined}
               />
@@ -483,11 +478,10 @@ function AuthPageContent() {
                 required
                 value={signInForm.email_or_username}
                 onChange={handleSignInChange}
-                className={`peer w-full rounded-2xl border-2 px-5 py-4 text-base text-gray-900 transition-all focus:outline-none ${
-                  getFieldError(validationErrors, 'email_or_username') && touchedFields.has('email_or_username')
+                className={`peer w-full rounded-2xl border-2 px-5 py-4 text-base text-gray-900 transition-all focus:outline-none ${getFieldError(validationErrors, 'email_or_username') && touchedFields.has('email_or_username')
                     ? 'border-red-500 focus:border-red-600'
                     : 'border-blue-500 focus:border-blue-600'
-                }`}
+                  }`}
                 aria-invalid={!!getFieldError(validationErrors, 'email_or_username')}
                 aria-describedby={getFieldError(validationErrors, 'email_or_username') ? 'email_or_username-error' : undefined}
               />
@@ -510,11 +504,10 @@ function AuthPageContent() {
                 required
                 value={signInForm.password}
                 onChange={handleSignInChange}
-                className={`peer w-full rounded-2xl border-2 px-5 py-4 pr-12 text-base text-gray-900 transition-all focus:outline-none ${
-                  getFieldError(validationErrors, 'password') && touchedFields.has('password')
+                className={`peer w-full rounded-2xl border-2 px-5 py-4 pr-12 text-base text-gray-900 transition-all focus:outline-none ${getFieldError(validationErrors, 'password') && touchedFields.has('password')
                     ? 'border-red-500 focus:border-red-600'
                     : 'border-blue-500 focus:border-blue-600'
-                }`}
+                  }`}
                 aria-invalid={!!getFieldError(validationErrors, 'password')}
                 aria-describedby={getFieldError(validationErrors, 'password') ? 'password-error' : undefined}
               />
@@ -599,7 +592,7 @@ function AuthPageContent() {
           >
             <div className="flex h-5 w-5 items-center justify-center">
               <Image
-                src="/assets/auth/google.jpg"
+                src="/assets/auth/google.png"
                 alt="Google"
                 width={24}
                 height={24}
@@ -631,7 +624,7 @@ function AuthPageContent() {
           >
             <div className="flex h-5 w-5 items-center justify-center">
               <svg className="h-5 w-5" fill="#0A66C2" viewBox="0 0 24 24">
-                <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
               </svg>
             </div>
             Continue with LinkedIn
