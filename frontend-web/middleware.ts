@@ -17,9 +17,9 @@ const RATE_LIMIT_WINDOW = parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 
 function rateLimit(request: NextRequest): boolean {
   const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
   const now = Date.now();
-  
+
   const rateLimitData = rateLimitMap.get(ip);
-  
+
   if (!rateLimitData || now > rateLimitData.resetTime) {
     // Reset or initialize
     rateLimitMap.set(ip, {
@@ -28,11 +28,11 @@ function rateLimit(request: NextRequest): boolean {
     });
     return true;
   }
-  
+
   if (rateLimitData.count >= RATE_LIMIT_MAX) {
     return false; // Rate limit exceeded
   }
-  
+
   rateLimitData.count++;
   return true;
 }
@@ -51,7 +51,7 @@ if (typeof setInterval !== 'undefined') {
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  
+
   // Apply rate limiting to API proxy routes
   if (pathname.startsWith('/api/proxy')) {
     if (!rateLimit(request)) {
@@ -67,16 +67,14 @@ export function middleware(request: NextRequest) {
       );
     }
   }
-  
+
   // Generate CSP nonce
   const nonce = generateNonce();
-  
+
   // Build Content Security Policy
   const cspHeader = `
     default-src 'self';
-    script-src 'self' 'nonce-${nonce}' 'strict-dynamic' ${
-      process.env.NODE_ENV === 'development' ? "'unsafe-eval'" : ''
-    };
+    script-src 'self' 'unsafe-inline' 'unsafe-eval' https: http:;
     style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
     img-src 'self' data: blob: https: http:;
     font-src 'self' https://fonts.gstatic.com;
@@ -88,10 +86,10 @@ export function middleware(request: NextRequest) {
     frame-ancestors 'none';
     upgrade-insecure-requests;
   `.replace(/\s{2,}/g, ' ').trim();
-  
+
   // Create response
   const response = NextResponse.next();
-  
+
   // Set security headers
   response.headers.set('Content-Security-Policy', cspHeader);
   response.headers.set('X-Content-Security-Policy', cspHeader); // Legacy
@@ -101,7 +99,7 @@ export function middleware(request: NextRequest) {
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-  
+
   // Set secure cookie headers if in production
   if (process.env.NODE_ENV === 'production') {
     response.headers.set(
@@ -109,7 +107,7 @@ export function middleware(request: NextRequest) {
       'max-age=31536000; includeSubDomains; preload'
     );
   }
-  
+
   return response;
 }
 
