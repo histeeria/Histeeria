@@ -71,28 +71,28 @@ class UnifiedWebSocket {
   private ws: WebSocket | null = null;
   private url: string;
   private token: string | null = null;
-  
+
   // Connection management
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 10;
   private reconnectDelay = 1000;
   private isIntentionallyClosed = false;
   private isConnecting = false;
-  
+
   // Message handling
   private messageHandlers: Map<string, Set<MessageHandler>> = new Map();
   private connectionStateHandlers: Set<ConnectionStateHandler> = new Set();
-  
+
   // Heartbeat
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private heartbeatIntervalMs = 30000; // 30 seconds
-  
+
   // Message queue for offline scenarios
   private messageQueue: Array<{ type: string; data?: any; channel?: string }> = [];
-  
+
   // Connection state
   private connectionState: 'disconnected' | 'connecting' | 'connected' | 'closing' = 'disconnected';
-  
+
   private constructor() {
     this.url = this.buildWebSocketURL();
   }
@@ -112,28 +112,30 @@ class UnifiedWebSocket {
       return ''; // SSR
     }
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    
-    // Check for explicit API URL in environment
-    const envApiUrl = process.env.NEXT_PUBLIC_API_URL;
-    
-    if (envApiUrl) {
-      // Extract host from API URL
-      const host = envApiUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
-      return `${protocol}//${host}/api/v1/ws`;
+    // 1. Priority: Explicit WebSocket URL from env
+    const envWsUrl = process.env.NEXT_PUBLIC_WS_URL;
+    if (envWsUrl) {
+      return envWsUrl;
     }
-    
-    // Development: use localhost:8081
-    const isDevelopment = 
+
+    // 2. Fallback: Derive from API Base URL
+    const envApiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL;
+    if (envApiUrl) {
+      return envApiUrl.replace(/^http/, 'ws');
+    }
+
+    // 3. Development/Localhost fallback
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const isDevelopment =
       window.location.hostname === 'localhost' ||
       window.location.hostname === '127.0.0.1' ||
       process.env.NODE_ENV === 'development';
-    
+
     if (isDevelopment) {
       return `${protocol}//localhost:8081/api/v1/ws`;
     }
-    
-    // Production: use current hostname
+
+    // 4. Production fallback (unlikely to work if proxy doesn't support WS, but better than nothing)
     return `${protocol}//${window.location.hostname}/api/v1/ws`;
   }
 
@@ -146,13 +148,13 @@ class UnifiedWebSocket {
       // Extract HTTP URL from WebSocket URL
       const httpUrl = this.url.replace(/^ws/, 'http').replace(/^wss/, 'https');
       const healthUrl = httpUrl.replace('/api/v1/ws', '/api/v1/status');
-      
+
       const response = await fetch(healthUrl, {
         method: 'GET',
         signal: AbortSignal.timeout(3000), // 3 second timeout
         mode: 'cors', // Explicitly request CORS
       });
-      
+
       return response.ok;
     } catch (error: any) {
       // CORS errors, network errors, timeouts - all are non-critical
@@ -247,9 +249,9 @@ class UnifiedWebSocket {
     this.ws.onclose = (event) => {
       const code = event.code;
       const reason = event.reason || 'No reason provided';
-      
+
       console.log('[UnifiedWS] Disconnected. Code:', code, 'Reason:', reason);
-      
+
       // Provide helpful error messages for common close codes
       if (code === 1006) {
         console.error('[UnifiedWS] ⚠️ Abnormal closure (1006) - Backend server likely not running or unreachable');
@@ -268,7 +270,7 @@ class UnifiedWebSocket {
       } else if (code === 1011) {
         console.error('[UnifiedWS] Server error');
       }
-      
+
       this.isConnecting = false;
       this.ws = null;
       this.setConnectionState('disconnected');
@@ -286,7 +288,7 @@ class UnifiedWebSocket {
   private handleIncomingMessage(rawMessage: WSMessage | WSMessageEnvelope): void {
     // Check if it's an envelope format (has channel field)
     const isEnvelope = 'channel' in rawMessage && rawMessage.channel;
-    
+
     if (isEnvelope) {
       const envelope = rawMessage as WSMessageEnvelope;
       this.handleEnvelopeMessage(envelope);
@@ -302,10 +304,10 @@ class UnifiedWebSocket {
    */
   private handleEnvelopeMessage(envelope: WSMessageEnvelope): void {
     console.log(`[UnifiedWS] 📨 Received envelope: ${envelope.type} on channel ${envelope.channel}`);
-    
+
     // Route based on channel and type
     const handlers = this.messageHandlers.get(envelope.type);
-    
+
     if (handlers && handlers.size > 0) {
       handlers.forEach(handler => {
         try {
@@ -317,7 +319,7 @@ class UnifiedWebSocket {
     } else {
       console.warn(`[UnifiedWS] No handlers registered for type: ${envelope.type}`);
     }
-    
+
     // Send ACK for critical messages
     if (envelope.type === 'new_message' || envelope.type === 'message_delivered') {
       this.sendACK(envelope.id);
@@ -332,12 +334,12 @@ class UnifiedWebSocket {
     if (message.type === 'pong') {
       return; // Silent
     }
-    
+
     if (message.type === 'ping') {
       this.send({ type: 'pong' });
       return;
     }
-    
+
     // Route to handlers
     const handlers = this.messageHandlers.get(message.type);
     if (handlers) {
@@ -371,12 +373,12 @@ class UnifiedWebSocket {
     console.log('[UnifiedWS] Disconnecting...');
     this.isIntentionallyClosed = true;
     this.stopHeartbeat();
-    
+
     if (this.ws) {
       this.ws.close();
       this.ws = null;
     }
-    
+
     this.setConnectionState('disconnected');
   }
 
@@ -387,9 +389,9 @@ class UnifiedWebSocket {
     if (!this.messageHandlers.has(eventType)) {
       this.messageHandlers.set(eventType, new Set());
     }
-    
+
     this.messageHandlers.get(eventType)!.add(handler);
-    
+
     // Return unsubscribe function
     return () => {
       this.off(eventType, handler);
@@ -414,10 +416,10 @@ class UnifiedWebSocket {
    */
   public onConnectionStateChange(handler: ConnectionStateHandler): () => void {
     this.connectionStateHandlers.add(handler);
-    
+
     // Immediately notify current state
     handler(this.connectionState === 'connected');
-    
+
     // Return unsubscribe function
     return () => {
       this.connectionStateHandlers.delete(handler);
@@ -454,9 +456,9 @@ class UnifiedWebSocket {
    */
   private flushMessageQueue(): void {
     if (this.messageQueue.length === 0) return;
-    
+
     console.log(`[UnifiedWS] Flushing ${this.messageQueue.length} queued messages`);
-    
+
     while (this.messageQueue.length > 0) {
       const message = this.messageQueue.shift();
       if (message) {
@@ -498,7 +500,7 @@ class UnifiedWebSocket {
    */
   private startHeartbeat(): void {
     this.stopHeartbeat();
-    
+
     this.heartbeatInterval = setInterval(() => {
       if (this.ws?.readyState === WebSocket.OPEN) {
         this.send({ type: 'ping' });
@@ -522,7 +524,7 @@ class UnifiedWebSocket {
   private setConnectionState(state: 'disconnected' | 'connecting' | 'connected' | 'closing'): void {
     this.connectionState = state;
     const isConnected = state === 'connected';
-    
+
     this.connectionStateHandlers.forEach(handler => {
       try {
         handler(isConnected);
@@ -536,9 +538,9 @@ class UnifiedWebSocket {
    * Check if connected
    */
   public isConnected(): boolean {
-    return this.connectionState === 'connected' && 
-           this.ws !== null && 
-           this.ws.readyState === WebSocket.OPEN;
+    return this.connectionState === 'connected' &&
+      this.ws !== null &&
+      this.ws.readyState === WebSocket.OPEN;
   }
 
   /**
