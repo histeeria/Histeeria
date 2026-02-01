@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../../../../core/utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
@@ -205,18 +206,18 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           final uploadResponse = await _postsService.uploadImage(filePath);
           if (uploadResponse.success && uploadResponse.data != null) {
             final url = uploadResponse.data!['url'] as String? ?? '';
-            print('[CreatePost] ✅ Image uploaded successfully');
-            print('[CreatePost] Image URL: $url');
-            print('[CreatePost] URL length: ${url.length}');
-            print('[CreatePost] URL starts with http: ${url.startsWith("http")}');
+            AppLogger.debug('[CreatePost] ✅ Image uploaded successfully');
+            AppLogger.debug('[CreatePost] Image URL: $url');
+            AppLogger.debug('[CreatePost] URL length: ${url.length}');
+            AppLogger.debug('[CreatePost] URL starts with http: ${url.startsWith("http")}');
             if (url.isNotEmpty) {
               _selectedMedia.add(url);
               _selectedMediaTypes.add('image');
             } else {
-              print('[CreatePost] ⚠️ WARNING: URL is empty!');
+              AppLogger.debug('[CreatePost] ⚠️ WARNING: URL is empty!');
             }
           } else {
-            print('[CreatePost] ❌ Failed to upload image: ${uploadResponse.error}');
+            AppLogger.debug('[CreatePost] ❌ Failed to upload image: ${uploadResponse.error}');
           }
         }
       }

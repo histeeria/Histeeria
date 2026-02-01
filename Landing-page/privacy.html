@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy | Histeeria</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .legal-page {
+            padding-top: 140px;
+            padding-bottom: 100px;
+        }
+
+        .legal-content {
+            max-width: 900px;
+            margin: 0 auto;
+            background: var(--surface);
+            padding: 60px;
+            border-radius: 32px;
+            border: 1px solid var(--border);
+        }
+
+        .legal-content h1 {
+            font-size: 48px;
+            margin-bottom: 40px;
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .legal-content h2 {
+            font-size: 28px;
+            margin-top: 40px;
+            margin-bottom: 20px;
+            color: white;
+        }
+
+        .legal-content h3 {
+            font-size: 20px;
+            margin-top: 24px;
+            margin-bottom: 12px;
+            color: var(--text);
+        }
+
+        .legal-content p {
+            color: var(--text-muted);
+            margin-bottom: 16px;
+            font-size: 16px;
+        }
+
+        .legal-content ul {
+            margin-bottom: 20px;
+            padding-left: 20px;
+            color: var(--text-muted);
+        }
+
+        .legal-content li {
+            margin-bottom: 8px;
+        }
+
+        .legal-meta {
+            margin-bottom: 40px;
+            color: var(--text-muted);
+            font-size: 14px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <header class="header" id="header">
+        <div class="container header-container">
+            <a href="index.html" class="logo">
+                <img src="assets/u.png" alt="Histeeria Logo" class="brand-logo">
+                <span class="logo-text">Histeeria</span>
+            </a>
+            <nav class="nav">
+                <ul class="nav-list">
+                    <li><a href="index.html#vision">Vision</a></li>
+                    <li><a href="index.html#features">Features</a></li>
+                    <li><a href="index.html#security">Security</a></li>
+                </ul>
+            </nav>
+            <div class="header-actions">
+                <a href="https://app.histeeria.com" class="btn btn-premium-glow btn-sm">Launch App</a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <section class="legal-page">
+            <div class="container">
+                <div class="legal-content">
+                    <h1>Privacy Policy</h1>
+                    <div class="legal-meta">Last Updated: January 29, 2026</div>
+
+                    <p>At Histeeria, privacy is not an afterthought; it is our foundation. This Privacy Policy explains
+                        what data we collect, why we collect it, and—most importantly—what we <strong>cannot</strong>
+                        see due to our zero-knowledge architecture.</p>
+
+                    <h2>1. Data Minimization</h2>
+                    <p>We adhere to the principle of data minimization. We only collect the absolute minimum information
+                        required to operate the service. Any data that can be end-to-end encrypted (E2EE) is encrypted
+                        on your device before it ever touches our servers.</p>
+
+                    <h2>2. Information We Collect</h2>
+                    <h3>2.1 Account Information</h3>
+                    <p>To create an account, you must provide:</p>
+                    <ul>
+                        <li>A username (public).</li>
+                        <li>An email address (private, used only for recovery and authentication).</li>
+                        <li>A public key (used for E2EE routing, does not decrypt messages).</li>
+                    </ul>
+
+                    <h3>2.2 Encrypted Content</h3>
+                    <p>Your messages, private notes, and private files are encrypted on your device using AES-256-GCM
+                        before upload. <strong>We store these encrypted blobs, but we do not possess the private keys
+                            required to decrypt them.</strong> Consequently, we cannot read your private communications
+                        even if compelled by law enforcement.</p>
+
+                    <h3>2.3 Public Content</h3>
+                    <p>Content you explicitly post to the public feed (e.g., Articles, Statuses) is stored in plaintext
+                        or encrypted with a public key to allow global visibility. You retain the right to delete this
+                        content at any time.</p>
+
+                    <h3>2.4 Usage Data</h3>
+                    <p>We may collect anonymous, aggregated telemetry (e.g., app crashes, api latency) to improve system
+                        performance. We do not track user behavior across third-party sites (no advertising pixels).</p>
+
+                    <h2>3. How We Use Your Information</h2>
+                    <ul>
+                        <li>To route and deliver encrypted messages.</li>
+                        <li>To maintain your social graph (followers/following).</li>
+                        <li>To prevent abuse and spam (e.g., rate limiting).</li>
+                    </ul>
+
+                    <h2>4. Data Sharing & Third Parties</h2>
+                    <p>We do not sell your data. We use trusted infrastructure providers solely to host the service:</p>
+                    <ul>
+                        <li><strong>Supabase/PostgreSQL:</strong> For encrypted database storage.</li>
+                        <li><strong>Railway:</strong> For backend API hosting.</li>
+                        <li><strong>Vercel:</strong> For web application delivery.</li>
+                    </ul>
+
+                    <h2>5. Your Rights</h2>
+                    <p>You have the right to request a copy of your data (Export) or delete your account (Erasure) at
+                        any time through the app settings. Deletion is permanent and removes your data from our active
+                        servers immediately.</p>
+
+                    <h2>6. Contact</h2>
+                    <p>For privacy concerns, contact our Data Protection Officer at privacy@histeeria.com.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-bottom">
+                <div class="footer-copyright">
+                    <p>&copy; 2026 Histeeria. All rights reserved.</p>
+                </div>
+                <div class="footer-links-grid" style="display: flex; gap: 20px; list-style: none;">
+                    <li><a href="terms.html" style="color: var(--text-muted); text-decoration: none;">Terms</a></li>
+                    <li><a href="privacy.html" style="color: var(--text-muted); text-decoration: none;">Privacy</a></li>
+                    <li><a href="gdpr.html" style="color: var(--text-muted); text-decoration: none;">GDPR</a></li>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+
+</html>

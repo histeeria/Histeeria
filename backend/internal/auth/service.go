@@ -7,28 +7,16 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"sync"
 	"time"
 
+	"histeeria-backend/internal/cache"
 	"histeeria-backend/internal/models"
 	"histeeria-backend/internal/queue"
 	"histeeria-backend/internal/repository"
 	"histeeria-backend/internal/utils"
 	"histeeria-backend/pkg/errors"
 
-	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
-)
-
-// In-memory OTP storage (fallback when Redis is not available)
-type otpEntry struct {
-	code      string
-	expiresAt time.Time
-}
-
-var (
-	inMemoryOTPStore = make(map[string]otpEntry)
-	otpStoreMutex    sync.RWMutex
 )
 
 // AuthService handles authentication business logic
@@ -38,7 +26,7 @@ type AuthService struct {
 	queueProvider queue.QueueProvider // Queue provider for async email sending
 	jwtSvc        *utils.JWTService
 	blacklist     *utils.TokenBlacklist
-	redis         *redis.Client // Optional: for OTP caching
+	cacheProvider cache.CacheProvider // Generic cache provider (Redis or Memory)
 }
 
 // NewAuthService creates a new authentication service
@@ -55,13 +43,13 @@ func NewAuthService(
 		queueProvider: queueProvider,
 		jwtSvc:        jwtSvc,
 		blacklist:     blacklist,
-		redis:         nil, // Will be set if Redis is available
+		cacheProvider: nil, // Will be set if Redis is available
 	}
 }
 
-// SetRedis sets the Redis client for OTP caching
-func (s *AuthService) SetRedis(redisClient *redis.Client) {
-	s.redis = redisClient
+// SetCacheProvider sets the cache provider for OTP caching
+func (s *AuthService) SetCacheProvider(provider cache.CacheProvider) {
+	s.cacheProvider = provider
 }
 
 // RegisterUser handles user registration
@@ -503,22 +491,15 @@ func (s *AuthService) SendOTPForSignup(ctx context.Context, email string) (*mode
 	// Generate verification code
 	verificationCode := s.emailSvc.GenerateVerificationCode()
 
-	// Store OTP in Redis (if available) or in-memory with 10 minute expiry
-	if s.redis != nil {
+	// Store OTP in cache with 10 minute expiry
+	if s.cacheProvider != nil {
 		otpKey := fmt.Sprintf("signup_otp:%s", normalizedEmail)
-		if err := s.redis.Set(ctx, otpKey, verificationCode, 10*time.Minute).Err(); err != nil {
-			log.Printf("[AuthService] Failed to store OTP in Redis: %v", err)
+		if err := s.cacheProvider.Set(ctx, otpKey, verificationCode, 10*time.Minute); err != nil {
+			log.Printf("[AuthService] Failed to store OTP in cache: %v", err)
 			// Continue anyway - OTP will be sent but not cached
 		}
 	} else {
-		// Fallback to in-memory storage (for development without Redis)
-		otpStoreMutex.Lock()
-		inMemoryOTPStore[normalizedEmail] = otpEntry{
-			code:      verificationCode,
-			expiresAt: time.Now().Add(10 * time.Minute),
-		}
-		otpStoreMutex.Unlock()
-		log.Printf("[AuthService] OTP stored in memory for %s (Redis not available)", normalizedEmail)
+		log.Printf("[AuthService] WARNING: No cache provider configured, OTP for %s will not be cached", normalizedEmail)
 	}
 
 	// Queue verification email (async)
@@ -549,52 +530,27 @@ func (s *AuthService) SendOTPForSignup(ctx context.Context, email string) (*mode
 func (s *AuthService) VerifySignupOTP(ctx context.Context, email, code string) (bool, error) {
 	normalizedEmail := utils.NormalizeEmail(email)
 
-	// Try Redis first
-	if s.redis != nil {
-		otpKey := fmt.Sprintf("signup_otp:%s", normalizedEmail)
+	if s.cacheProvider == nil {
+		return false, errors.NewAppError(http.StatusInternalServerError, "Cache provider not configured", "Server error")
+	}
 
-		// Get OTP from Redis
-		storedCode, err := s.redis.Get(ctx, otpKey).Result()
-		if err == redis.Nil {
+	otpKey := fmt.Sprintf("signup_otp:%s", normalizedEmail)
+
+	// Get OTP from cache
+	storedCode, err := s.cacheProvider.Get(ctx, otpKey)
+	if err != nil {
+		if cache.IsCacheMiss(err) {
 			// OTP not found or expired
 			return false, errors.ErrVerificationCodeExpired
 		}
-		if err != nil {
-			return false, errors.ErrInternalServer
-		}
-
-		// Verify code matches (but don't delete - let registration delete it)
-		if storedCode != code {
-			return false, errors.ErrInvalidVerificationCode
-		}
-
-		return true, nil
+		return false, errors.ErrInternalServer
 	}
 
-	// Fallback to in-memory storage
-	otpStoreMutex.RLock()
-	entry, exists := inMemoryOTPStore[normalizedEmail]
-	otpStoreMutex.RUnlock()
-
-	if !exists {
-		return false, errors.ErrVerificationCodeExpired
-	}
-
-	// Check if expired
-	if time.Now().After(entry.expiresAt) {
-		// Clean up expired entry
-		otpStoreMutex.Lock()
-		delete(inMemoryOTPStore, normalizedEmail)
-		otpStoreMutex.Unlock()
-		return false, errors.ErrVerificationCodeExpired
-	}
-
-	// Verify code matches
-	if entry.code != code {
+	// Verify code matches (but don't delete - let registration delete it)
+	if storedCode != code {
 		return false, errors.ErrInvalidVerificationCode
 	}
 
-	log.Printf("[AuthService] OTP verified from memory for %s", normalizedEmail)
 	return true, nil
 }
 
@@ -602,54 +558,29 @@ func (s *AuthService) VerifySignupOTP(ctx context.Context, email, code string) (
 func (s *AuthService) ConsumeSignupOTP(ctx context.Context, email, code string) (bool, error) {
 	normalizedEmail := utils.NormalizeEmail(email)
 
-	// Try Redis first
-	if s.redis != nil {
-		otpKey := fmt.Sprintf("signup_otp:%s", normalizedEmail)
+	if s.cacheProvider == nil {
+		return false, errors.NewAppError(http.StatusInternalServerError, "Cache provider not configured", "Server error")
+	}
 
-		// Get OTP from Redis
-		storedCode, err := s.redis.Get(ctx, otpKey).Result()
-		if err == redis.Nil {
+	otpKey := fmt.Sprintf("signup_otp:%s", normalizedEmail)
+
+	// Get OTP from cache
+	storedCode, err := s.cacheProvider.Get(ctx, otpKey)
+	if err != nil {
+		if cache.IsCacheMiss(err) {
 			// OTP not found or expired
 			return false, errors.ErrVerificationCodeExpired
 		}
-		if err != nil {
-			return false, errors.ErrInternalServer
-		}
-
-		// Verify code matches
-		if storedCode != code {
-			return false, errors.ErrInvalidVerificationCode
-		}
-
-		// Delete OTP after successful verification (consumed during registration)
-		s.redis.Del(ctx, otpKey)
-
-		return true, nil
-	}
-
-	// Fallback to in-memory storage
-	otpStoreMutex.Lock()
-	defer otpStoreMutex.Unlock()
-
-	entry, exists := inMemoryOTPStore[normalizedEmail]
-	if !exists {
-		return false, errors.ErrVerificationCodeExpired
-	}
-
-	// Check if expired
-	if time.Now().After(entry.expiresAt) {
-		delete(inMemoryOTPStore, normalizedEmail)
-		return false, errors.ErrVerificationCodeExpired
+		return false, errors.ErrInternalServer
 	}
 
 	// Verify code matches
-	if entry.code != code {
+	if storedCode != code {
 		return false, errors.ErrInvalidVerificationCode
 	}
 
-	// Delete OTP after successful verification (consumed)
-	delete(inMemoryOTPStore, normalizedEmail)
-	log.Printf("[AuthService] OTP consumed from memory for %s", normalizedEmail)
+	// Delete OTP after successful verification (consumed during registration)
+	s.cacheProvider.Delete(ctx, otpKey)
 
 	return true, nil
 }
