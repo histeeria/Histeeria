@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../utils/app_logger.dart';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'environment.dart';
@@ -143,7 +144,7 @@ class ApiConfig {
       apiBaseUrl = apiBaseUrl.replaceAll(RegExp(r'/$'), '');
       
       if (kDebugMode) {
-        print('[ApiConfig] Fetching storage URL from: $apiBaseUrl/config/storage-url');
+        AppLogger.debug('[ApiConfig] Fetching storage URL from: $apiBaseUrl/config/storage-url');
       }
       
       final response = await dio.get(
@@ -155,8 +156,8 @@ class ApiConfig {
       );
       
       if (kDebugMode) {
-        print('[ApiConfig] Storage URL response status: ${response.statusCode}');
-        print('[ApiConfig] Storage URL response data: ${response.data}');
+        AppLogger.debug('[ApiConfig] Storage URL response status: ${response.statusCode}');
+        AppLogger.debug('[ApiConfig] Storage URL response data: ${response.data}');
       }
       
       if (response.statusCode == 200) {
@@ -166,7 +167,7 @@ class ApiConfig {
             // Ensure URL doesn't have trailing slash
             _cachedSupabaseStorageUrl = storageUrl.replaceAll(RegExp(r'/$'), '');
             if (kDebugMode) {
-              print('[ApiConfig] ✅ Cached storage URL: $_cachedSupabaseStorageUrl');
+              AppLogger.debug('[ApiConfig] ✅ Cached storage URL: $_cachedSupabaseStorageUrl');
             }
             return;
           }
@@ -176,7 +177,7 @@ class ApiConfig {
           if (storageUrl.isNotEmpty) {
             _cachedSupabaseStorageUrl = storageUrl.replaceAll(RegExp(r'/$'), '');
             if (kDebugMode) {
-              print('[ApiConfig] ✅ Cached storage URL (string): $_cachedSupabaseStorageUrl');
+              AppLogger.debug('[ApiConfig] ✅ Cached storage URL (string): $_cachedSupabaseStorageUrl');
             }
             return;
           }
@@ -184,13 +185,13 @@ class ApiConfig {
       } else if (response.statusCode == 503) {
         // Backend returned service unavailable - SUPABASE_URL not configured
         if (kDebugMode) {
-          print('[ApiConfig] ⚠️ Backend reports SUPABASE_URL not configured');
+          AppLogger.debug('[ApiConfig] ⚠️ Backend reports SUPABASE_URL not configured');
         }
       }
     } catch (e) {
       // Log error for debugging but continue - will try to use environment variable
       if (kDebugMode) {
-        print('[ApiConfig] ❌ Failed to fetch storage URL: $e');
+        AppLogger.debug('[ApiConfig] ❌ Failed to fetch storage URL: $e');
       }
     }
     
@@ -199,11 +200,11 @@ class ApiConfig {
     if (envSupabaseUrl.isNotEmpty) {
       _cachedSupabaseStorageUrl = envSupabaseUrl.replaceAll(RegExp(r'/$'), '');
       if (kDebugMode) {
-        print('[ApiConfig] ✅ Using environment variable SUPABASE_URL: $_cachedSupabaseStorageUrl');
+        AppLogger.debug('[ApiConfig] ✅ Using environment variable SUPABASE_URL: $_cachedSupabaseStorageUrl');
       }
     } else {
       if (kDebugMode) {
-        print('[ApiConfig] ⚠️ No SUPABASE_URL found in environment variables');
+        AppLogger.debug('[ApiConfig] ⚠️ No SUPABASE_URL found in environment variables');
       }
     }
   }

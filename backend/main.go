@@ -30,7 +30,6 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/go-redis/redis/v8"
 )
 
 func main() {
@@ -51,7 +50,6 @@ func main() {
 	// 2. INITIALIZE CACHE PROVIDER (Redis or In-Memory)
 	// ============================================
 	var cacheProvider cache.CacheProvider
-	var redisClient interface{} // For backward compatibility with existing code
 
 	redisConnected := false
 	if cfg.Redis.Host != "" {
@@ -69,7 +67,6 @@ func main() {
 			cacheProvider = cache.NewMemoryProvider()
 		} else {
 			cacheProvider = rp
-			redisClient = rp.GetClient()
 			redisConnected = true
 			log.Println("[Cache] Redis connected successfully")
 		}
@@ -259,15 +256,14 @@ func main() {
 
 	// Initialize Redis Pub/Sub for multi-instance WebSocket scaling
 	var wsPubSub *websocket.PubSubManager
-	if redisConnected {
-		if rp, ok := cacheProvider.(*cache.RedisProvider); ok {
-			wsPubSub = websocket.NewPubSubManager(rp.GetClient(), wsManager)
-			wsPubSub.Start()
-			log.Println("[WebSocket] Manager started with Redis Pub/Sub for multi-instance scaling")
+	if cacheProvider != nil {
+		wsPubSub = websocket.NewPubSubManager(cacheProvider, wsManager)
+		wsPubSub.Start()
+		if wsPubSub.IsEnabled() {
+			log.Println("[WebSocket] Manager started with distributed Pub/Sub scaling support")
+		} else {
+			log.Println("[WebSocket] Manager started (single-instance mode - distributed sync disabled)")
 		}
-	}
-	if wsPubSub == nil || !wsPubSub.IsEnabled() {
-		log.Println("[WebSocket] Manager started (single-instance mode - no Redis Pub/Sub)")
 	}
 
 	// ============================================
@@ -295,15 +291,8 @@ func main() {
 	// ============================================
 	// 10. INITIALIZE MESSAGING SYSTEM
 	// ============================================
-	var messageCacheSvc *cache.MessageCacheService
-	if redisConnected {
-		// Initialize Redis client for the old cache service
-		oldRedisClient, err := cache.InitializeRedis(cfg.Redis.Host, cfg.Redis.Port, cfg.Redis.Password, cfg.Redis.DB)
-		if err == nil {
-			messageCacheSvc = cache.NewMessageCacheService(oldRedisClient)
-			// Note: Auth service Redis will be set after queue initialization
-		}
-	}
+	// Messaging cache service uses the unified provider (handles fallback internally)
+	messageCacheSvc := cache.NewMessageCacheService(cacheProvider)
 
 	// Create delivery repository adapter (WhatsApp-style store-and-forward)
 	deliveryRepoAdapter := repository.NewDeliveryRepositoryAdapter(
@@ -397,13 +386,8 @@ func main() {
 	// ============================================
 	// Auth service requires queue provider for async emails
 	authSvc = auth.NewAuthService(userRepo, emailSvc, queueProvider, jwtSvc, tokenBlacklist)
-
-	// Set Redis client for auth service OTP caching (if available)
-	if redisConnected {
-		if oldRedisClient, err := cache.InitializeRedis(cfg.Redis.Host, cfg.Redis.Port, cfg.Redis.Password, cfg.Redis.DB); err == nil {
-			authSvc.SetRedis(oldRedisClient)
-		}
-	}
+	// Set cache provider for auth service OTP caching (if available)
+	authSvc.SetCacheProvider(cacheProvider)
 
 	// Initialize account group repository and multi-account service
 	accountGroupRepo := repository.NewSupabaseAccountGroupRepository(cfg.Database.SupabaseURL, cfg.Database.SupabaseServiceKey)
@@ -430,15 +414,7 @@ func main() {
 	// ============================================
 	// 16. INITIALIZE HEALTH CHECKER
 	// ============================================
-	var healthChecker *utils.HealthChecker
-	if redisConnected {
-		if rp, ok := redisClient.(*redis.Client); ok {
-			healthChecker = utils.NewHealthChecker(rp)
-		}
-	}
-	if healthChecker == nil {
-		healthChecker = utils.NewHealthChecker(nil)
-	}
+	healthChecker := utils.NewHealthChecker(cacheProvider)
 
 	// Add custom health checks
 	healthChecker.AddCheck(utils.HealthCheck{

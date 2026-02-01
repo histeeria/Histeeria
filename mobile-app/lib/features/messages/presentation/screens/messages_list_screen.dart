@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../../core/utils/app_logger.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -59,38 +60,38 @@ class _MessagesListScreenState extends State<MessagesListScreen> {
   Future<void> _initializeWebSocket() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final currentUserId = authProvider.currentUserId;
-    print('[MessagesListScreen] 🔌 Initializing WebSocket for user: $currentUserId');
+    AppLogger.debug('[MessagesListScreen] 🔌 Initializing WebSocket for user: $currentUserId');
     
     if (currentUserId == null) {
-      print('[MessagesListScreen] ❌ No current user ID - skipping WebSocket init');
+      AppLogger.debug('[MessagesListScreen] ❌ No current user ID - skipping WebSocket init');
       return;
     }
 
     // Connect WebSocket
     final connected = await _wsService.connect(currentUserId);
-    print('[MessagesListScreen] 🔌 WebSocket connect result: $connected, isConnected: ${_wsService.isConnected}');
+    AppLogger.debug('[MessagesListScreen] 🔌 WebSocket connect result: $connected, isConnected: ${_wsService.isConnected}');
     
     // Register global listener for real-time list updates
     _wsService.setGlobalHandler(_handleGlobalWebSocketMessage);
-    print('[MessagesListScreen] ✅ Global handler registered');
+    AppLogger.debug('[MessagesListScreen] ✅ Global handler registered');
   }
 
   void _handleGlobalWebSocketMessage(WSMessageEnvelope envelope) {
     if (!mounted) return;
 
-    print('[MessagesListScreen] 🌐 GLOBAL HANDLER received: type=${envelope.type}, conversationId=${envelope.conversationId}');
-    print('[MessagesListScreen] 🌐 GLOBAL HANDLER data: ${envelope.data}');
+    AppLogger.debug('[MessagesListScreen] 🌐 GLOBAL HANDLER received: type=${envelope.type}, conversationId=${envelope.conversationId}');
+    AppLogger.debug('[MessagesListScreen] 🌐 GLOBAL HANDLER data: ${envelope.data}');
 
     if (envelope.type == 'new_message') {
       try {
         final messageData = envelope.data as Map<String, dynamic>;
-        print('[MessagesListScreen] ✅ Parsing message data: $messageData');
+        AppLogger.debug('[MessagesListScreen] ✅ Parsing message data: $messageData');
         final message = Message.fromJson(messageData);
-        print('[MessagesListScreen] ✅ Message parsed successfully: id=${message.id}, content=${message.content}');
+        AppLogger.debug('[MessagesListScreen] ✅ Message parsed successfully: id=${message.id}, content=${message.content}');
         _updateConversationWithNewMessage(message);
       } catch (e, stack) {
-        print('[MessagesListScreen] ❌ Error parsing real-time message: $e');
-        print('[MessagesListScreen] Stack: $stack');
+        AppLogger.debug('[MessagesListScreen] ❌ Error parsing real-time message: $e');
+        AppLogger.debug('[MessagesListScreen] Stack: $stack');
       }
     }
   }
@@ -137,7 +138,7 @@ class _MessagesListScreenState extends State<MessagesListScreen> {
           });
         }
       } catch (e) {
-        print('[MessagesListScreen] Failed to decrypt real-time message: $e');
+        AppLogger.debug('[MessagesListScreen] Failed to decrypt real-time message: $e');
       }
     } else {
       if (mounted) {
@@ -257,7 +258,7 @@ class _MessagesListScreenState extends State<MessagesListScreen> {
             });
           }
         } catch (e) {
-          print('[MessagesList] Failed to decrypt preview for ${conv.id}: $e');
+          AppLogger.debug('[MessagesList] Failed to decrypt preview for ${conv.id}: $e');
           if (mounted) {
             setState(() {
               _decryptedLastMessages[conv.id] = 'Encrypted message';

@@ -9,13 +9,14 @@ import (
 	"sync"
 	"time"
 
+	"histeeria-backend/internal/cache"
+
 	"github.com/gin-gonic/gin"
-	"github.com/go-redis/redis/v8"
 )
 
 // HealthChecker provides comprehensive health checking
 type HealthChecker struct {
-	redis     *redis.Client
+	provider  cache.CacheProvider
 	startTime time.Time
 	checks    []HealthCheck
 	mu        sync.RWMutex
@@ -30,13 +31,13 @@ type HealthCheck struct {
 
 // HealthStatus represents the overall health status
 type HealthStatus struct {
-	Status      string                   `json:"status"`       // healthy, degraded, unhealthy
-	Service     string                   `json:"service"`
-	Version     string                   `json:"version"`
-	Uptime      string                   `json:"uptime"`
-	Timestamp   string                   `json:"timestamp"`
-	Checks      map[string]CheckResult   `json:"checks"`
-	Stats       *RuntimeStats            `json:"stats,omitempty"`
+	Status    string                 `json:"status"` // healthy, degraded, unhealthy
+	Service   string                 `json:"service"`
+	Version   string                 `json:"version"`
+	Uptime    string                 `json:"uptime"`
+	Timestamp string                 `json:"timestamp"`
+	Checks    map[string]CheckResult `json:"checks"`
+	Stats     *RuntimeStats          `json:"stats,omitempty"`
 }
 
 // CheckResult represents the result of a single health check
@@ -48,27 +49,27 @@ type CheckResult struct {
 
 // RuntimeStats contains runtime statistics
 type RuntimeStats struct {
-	Goroutines   int    `json:"goroutines"`
-	MemoryAlloc  string `json:"memory_alloc"`
-	MemoryTotal  string `json:"memory_total"`
-	GCCycles     uint32 `json:"gc_cycles"`
-	CPUs         int    `json:"cpus"`
+	Goroutines  int    `json:"goroutines"`
+	MemoryAlloc string `json:"memory_alloc"`
+	MemoryTotal string `json:"memory_total"`
+	GCCycles    uint32 `json:"gc_cycles"`
+	CPUs        int    `json:"cpus"`
 }
 
 // NewHealthChecker creates a new health checker
-func NewHealthChecker(redis *redis.Client) *HealthChecker {
+func NewHealthChecker(provider cache.CacheProvider) *HealthChecker {
 	hc := &HealthChecker{
-		redis:     redis,
+		provider:  provider,
 		startTime: time.Now(),
 		checks:    make([]HealthCheck, 0),
 	}
 
 	// Add default Redis check if available
-	if redis != nil {
+	if provider != nil && provider.IsAvailable() {
 		hc.AddCheck(HealthCheck{
-			Name: "redis",
+			Name: "cache",
 			Check: func(ctx context.Context) error {
-				return redis.Ping(ctx).Err()
+				return provider.Ping(ctx)
 			},
 			Timeout: 5 * time.Second,
 		})
@@ -171,11 +172,11 @@ func (hc *HealthChecker) getRuntimeStats() *RuntimeStats {
 	runtime.ReadMemStats(&mem)
 
 	return &RuntimeStats{
-		Goroutines:   runtime.NumGoroutine(),
-		MemoryAlloc:  formatBytes(mem.Alloc),
-		MemoryTotal:  formatBytes(mem.TotalAlloc),
-		GCCycles:     mem.NumGC,
-		CPUs:         runtime.NumCPU(),
+		Goroutines:  runtime.NumGoroutine(),
+		MemoryAlloc: formatBytes(mem.Alloc),
+		MemoryTotal: formatBytes(mem.TotalAlloc),
+		GCCycles:    mem.NumGC,
+		CPUs:        runtime.NumCPU(),
 	}
 }
 
@@ -252,7 +253,7 @@ func (hc *HealthChecker) MetricsHandler() gin.HandlerFunc {
 
 		// Return metrics in Prometheus format
 		var sb strings.Builder
-		
+
 		sb.WriteString("# HELP histeeria_up Service up status\n")
 		sb.WriteString("# TYPE histeeria_up gauge\n")
 		if status.Status == "healthy" {
@@ -260,11 +261,11 @@ func (hc *HealthChecker) MetricsHandler() gin.HandlerFunc {
 		} else {
 			sb.WriteString("histeeria_up 0\n")
 		}
-		
+
 		sb.WriteString("# HELP histeeria_goroutines Number of goroutines\n")
 		sb.WriteString("# TYPE histeeria_goroutines gauge\n")
 		sb.WriteString(fmt.Sprintf("histeeria_goroutines %d\n", stats.Goroutines))
-		
+
 		sb.WriteString("# HELP histeeria_uptime_seconds Uptime in seconds\n")
 		sb.WriteString("# TYPE histeeria_uptime_seconds counter\n")
 		sb.WriteString(fmt.Sprintf("histeeria_uptime_seconds %d\n", int(time.Since(hc.startTime).Seconds())))
@@ -272,4 +273,3 @@ func (hc *HealthChecker) MetricsHandler() gin.HandlerFunc {
 		c.String(http.StatusOK, sb.String())
 	}
 }
-

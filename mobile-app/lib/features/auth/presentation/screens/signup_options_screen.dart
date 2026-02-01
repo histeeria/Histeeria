@@ -437,7 +437,7 @@ class _PrivacyTermsFooter extends StatelessWidget {
           const TextSpan(text: 'By signing up, you agree to Histeeria\'s '),
           WidgetSpan(
             child: GestureDetector(
-              onTap: () => _launchURL('https://www.histeeria.com/privacy-policy'),
+              onTap: () => _launchURL('https://histeeria.com/privacy'),
         child: Text(
                 'Privacy Policy',
                 style: AppTextStyles.bodySmall(
@@ -453,7 +453,7 @@ class _PrivacyTermsFooter extends StatelessWidget {
           const TextSpan(text: ' and '),
           WidgetSpan(
             child: GestureDetector(
-              onTap: () => _launchURL('https://www.histeeria.com/terms-of-use'),
+              onTap: () => _launchURL('https://histeeria.com/terms'),
         child: Text(
                 'Terms & Conditions',
                 style: AppTextStyles.bodySmall(

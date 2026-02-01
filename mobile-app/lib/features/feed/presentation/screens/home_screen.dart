@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/utils/app_logger.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -2879,13 +2880,13 @@ class _PostOptionsMenuState extends State<_PostOptionsMenu> {
   }
 
   void _showDeleteConfirmation() {
-    print('[PostOptionsMenu] Showing delete confirmation dialog for post: ${widget.postId}');
+    AppLogger.debug('[PostOptionsMenu] Showing delete confirmation dialog for post: ${widget.postId}');
     if (!mounted) return;
     
     showDialog(
       context: context,
       builder: (dialogContext) {
-        print('[PostOptionsMenu] Delete dialog shown');
+        AppLogger.debug('[PostOptionsMenu] Delete dialog shown');
         return AlertDialog(
           backgroundColor: AppColors.backgroundSecondary,
           title: Text(
@@ -2899,7 +2900,7 @@ class _PostOptionsMenuState extends State<_PostOptionsMenu> {
           actions: [
             TextButton(
               onPressed: () {
-                print('[PostOptionsMenu] Delete cancelled');
+                AppLogger.debug('[PostOptionsMenu] Delete cancelled');
                 Navigator.pop(dialogContext);
               },
               child: Text(
@@ -2909,7 +2910,7 @@ class _PostOptionsMenuState extends State<_PostOptionsMenu> {
             ),
             TextButton(
               onPressed: () {
-                print('[PostOptionsMenu] Delete confirmed, closing dialog and calling _deletePost');
+                AppLogger.debug('[PostOptionsMenu] Delete confirmed, closing dialog and calling _deletePost');
                 Navigator.pop(dialogContext);
                 // Call delete immediately after closing dialog
                 // Use WidgetsBinding to ensure we're in the right frame
@@ -2917,7 +2918,7 @@ class _PostOptionsMenuState extends State<_PostOptionsMenu> {
                   if (mounted) {
                     _deletePost();
                   } else {
-                    print('[PostOptionsMenu] Widget no longer mounted, cannot delete');
+                    AppLogger.debug('[PostOptionsMenu] Widget no longer mounted, cannot delete');
                   }
                 });
               },
@@ -2935,7 +2936,7 @@ class _PostOptionsMenuState extends State<_PostOptionsMenu> {
   Future<void> _deletePost() async {
     if (!mounted) return;
     
-    print('[PostOptionsMenu] Starting delete for post: ${widget.postId}');
+    AppLogger.debug('[PostOptionsMenu] Starting delete for post: ${widget.postId}');
     final postsService = PostsService();
     
     // Show loading
@@ -2948,15 +2949,15 @@ class _PostOptionsMenuState extends State<_PostOptionsMenu> {
       ),
     );
 
-    print('[PostOptionsMenu] Calling deletePost API...');
+    AppLogger.debug('[PostOptionsMenu] Calling deletePost API...');
     final response = await postsService.deletePost(widget.postId);
-    print('[PostOptionsMenu] Delete response received: success=${response.success}, error=${response.error}');
+    AppLogger.debug('[PostOptionsMenu] Delete response received: success=${response.success}, error=${response.error}');
 
     if (mounted) {
       Navigator.pop(context); // Close loading dialog
 
       if (response.success) {
-        print('[PostOptionsMenu] Post deleted successfully, refreshing feed...');
+        AppLogger.debug('[PostOptionsMenu] Post deleted successfully, refreshing feed...');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Post deleted successfully'),
@@ -2965,7 +2966,7 @@ class _PostOptionsMenuState extends State<_PostOptionsMenu> {
         );
         widget.onPostDeleted?.call();
       } else {
-        print('[PostOptionsMenu] Delete failed: ${response.error}');
+        AppLogger.debug('[PostOptionsMenu] Delete failed: ${response.error}');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(response.error ?? 'Failed to delete post'),

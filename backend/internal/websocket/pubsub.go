@@ -6,7 +6,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/go-redis/redis/v8"
+	"histeeria-backend/internal/cache"
+
 	"github.com/google/uuid"
 )
 
@@ -16,7 +17,7 @@ import (
 
 // PubSubManager handles Redis Pub/Sub for distributed WebSocket events
 type PubSubManager struct {
-	redis    *redis.Client
+	provider cache.CacheProvider
 	manager  *Manager
 	ctx      context.Context
 	cancel   context.CancelFunc
@@ -32,15 +33,15 @@ type PubSubMessage struct {
 }
 
 // NewPubSubManager creates a new Pub/Sub manager
-func NewPubSubManager(redisClient *redis.Client, wsManager *Manager) *PubSubManager {
+func NewPubSubManager(provider cache.CacheProvider, wsManager *Manager) *PubSubManager {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &PubSubManager{
-		redis:    redisClient,
+		provider: provider,
 		manager:  wsManager,
 		ctx:      ctx,
 		cancel:   cancel,
-		enabled:  redisClient != nil,
+		enabled:  provider != nil && provider.IsAvailable(),
 		channels: []string{"ws:broadcast", "ws:notification", "ws:message"},
 	}
 }
@@ -55,10 +56,7 @@ func (ps *PubSubManager) Start() {
 	log.Println("[PubSub] Starting Redis Pub/Sub listener...")
 
 	// Subscribe to channels
-	pubsub := ps.redis.Subscribe(ps.ctx, ps.channels...)
-
-	// Wait for subscription confirmation
-	_, err := pubsub.Receive(ps.ctx)
+	pubsub, err := ps.provider.Subscribe(ps.ctx, ps.channels...)
 	if err != nil {
 		log.Printf("[PubSub] Failed to subscribe: %v", err)
 		ps.enabled = false
@@ -78,7 +76,7 @@ func (ps *PubSubManager) Stop() {
 }
 
 // receiveMessages processes incoming Pub/Sub messages
-func (ps *PubSubManager) receiveMessages(pubsub *redis.PubSub) {
+func (ps *PubSubManager) receiveMessages(pubsub cache.Subscription) {
 	defer pubsub.Close()
 
 	ch := pubsub.Channel()
@@ -89,9 +87,10 @@ func (ps *PubSubManager) receiveMessages(pubsub *redis.PubSub) {
 			log.Println("[PubSub] Stopped")
 			return
 
-		case msg := <-ch:
-			if msg == nil {
-				continue
+		case msg, ok := <-ch:
+			if !ok {
+				log.Println("[PubSub] Channel closed")
+				return
 			}
 
 			ps.handleMessage(msg)
@@ -100,7 +99,7 @@ func (ps *PubSubManager) receiveMessages(pubsub *redis.PubSub) {
 }
 
 // handleMessage processes a single Pub/Sub message
-func (ps *PubSubManager) handleMessage(msg *redis.Message) {
+func (ps *PubSubManager) handleMessage(msg cache.Message) {
 	var pubsubMsg PubSubMessage
 	if err := json.Unmarshal([]byte(msg.Payload), &pubsubMsg); err != nil {
 		log.Printf("[PubSub] Failed to unmarshal message: %v", err)
@@ -184,7 +183,7 @@ func (ps *PubSubManager) PublishBroadcast(userIDStrs []string, payload interface
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	return ps.redis.Publish(ctx, "ws:broadcast", msgBytes).Err()
+	return ps.provider.Publish(ctx, "ws:broadcast", string(msgBytes))
 }
 
 // PublishNotification publishes a notification to all instances
@@ -212,7 +211,7 @@ func (ps *PubSubManager) PublishNotification(userIDStrs []string, payload interf
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	return ps.redis.Publish(ctx, "ws:notification", msgBytes).Err()
+	return ps.provider.Publish(ctx, "ws:notification", string(msgBytes))
 }
 
 // IsEnabled returns whether Pub/Sub is enabled

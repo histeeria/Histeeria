@@ -49,5 +49,11 @@
 		<true/>
 		<key>UIViewControllerBasedStatusBarAppearance</key>
 		<false/>
+		<key>NSCameraUsageDescription</key>
+		<string>Histeeria needs camera access to take photos and videos for posts and messages.</string>
+		<key>NSMicrophoneUsageDescription</key>
+		<string>Histeeria needs microphone access to record audio messages.</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>Histeeria needs photo library access to upload images to posts and messages.</string>
 	</dict>
 </plist>

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/widgets/gradient_background.dart';
+import '../../../../core/services/update_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -13,7 +14,58 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final _updateService = UpdateService();
   String _searchQuery = '';
+  bool _checkingUpdate = false;
+
+  Future<void> _checkForUpdates(BuildContext context) async {
+    setState(() => _checkingUpdate = true);
+    
+    // Show loading snackbar
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Checking for updates...'), duration: Duration(seconds: 1)),
+    );
+
+    final info = await _updateService.checkForUpdates();
+    setState(() => _checkingUpdate = false);
+
+    if (!mounted) return;
+
+    if (info != null && info.hasUpdate) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text('Update Available! 🚀'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Version ${info.latestVersion} is now available.'),
+              const SizedBox(height: 8),
+              Text(info.releaseNotes, maxLines: 3, overflow: TextOverflow.ellipsis),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Later'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _updateService.downloadUpdate(info.downloadUrl);
+              },
+              child: const Text('Update Now'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You are on the latest version! ✅')),
+      );
+    }
+  }
 
   @override
   void dispose() {
@@ -112,6 +164,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         'icon': Icons.language_outlined,
         'title': 'Language',
         'subtitle': 'Change app language',
+      },
+      {
+        'icon': Icons.system_update_outlined,
+        'title': 'App Updates',
+        'subtitle': 'Check for new versions',
+        'action': 'check_update',
       },
       {
         'icon': Icons.help_outline,
@@ -257,6 +315,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           context.push('/settings/account');
                         } else if (setting['route'] != null) {
                           context.push(setting['route']);
+                        } else if (setting['action'] == 'check_update') {
+                          _checkForUpdates(context);
                         } else {
                           // TODO: Navigate to other settings
                         }

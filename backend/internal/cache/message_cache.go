@@ -8,19 +8,18 @@ import (
 
 	"histeeria-backend/internal/models"
 
-	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
 )
 
 // MessageCacheService handles caching for messaging system
 type MessageCacheService struct {
-	redis *redis.Client
+	provider CacheProvider
 }
 
 // NewMessageCacheService creates a new message cache service
-func NewMessageCacheService(redisClient *redis.Client) *MessageCacheService {
+func NewMessageCacheService(provider CacheProvider) *MessageCacheService {
 	return &MessageCacheService{
-		redis: redisClient,
+		provider: provider,
 	}
 }
 
@@ -55,7 +54,7 @@ func (s *MessageCacheService) CacheMessages(ctx context.Context, conversationID 
 	key := fmt.Sprintf(keyConversationMessages, conversationID.String())
 
 	// Delete existing cache
-	s.redis.Del(ctx, key)
+	s.provider.Delete(ctx, key)
 
 	// Add messages to list (newest first)
 	for i := len(messages) - 1; i >= 0; i-- {
@@ -64,16 +63,16 @@ func (s *MessageCacheService) CacheMessages(ctx context.Context, conversationID 
 			return fmt.Errorf("failed to marshal message: %w", err)
 		}
 
-		if err := s.redis.LPush(ctx, key, msgJSON).Err(); err != nil {
+		if err := s.provider.LPush(ctx, key, string(msgJSON)); err != nil {
 			return fmt.Errorf("failed to cache message: %w", err)
 		}
 	}
 
 	// Keep only last 20 messages
-	s.redis.LTrim(ctx, key, 0, 19)
+	s.provider.LTrim(ctx, key, 0, 19)
 
 	// Set expiry to 1 hour
-	s.redis.Expire(ctx, key, 1*time.Hour)
+	s.provider.Expire(ctx, key, 1*time.Hour)
 
 	return nil
 }
@@ -83,9 +82,9 @@ func (s *MessageCacheService) GetCachedMessages(ctx context.Context, conversatio
 	key := fmt.Sprintf(keyConversationMessages, conversationID.String())
 
 	// Get messages from list
-	results, err := s.redis.LRange(ctx, key, 0, int64(limit-1)).Result()
+	results, err := s.provider.LRange(ctx, key, 0, int64(limit-1))
 	if err != nil {
-		if err == redis.Nil {
+		if IsCacheMiss(err) {
 			return nil, nil // Cache miss
 		}
 		return nil, fmt.Errorf("failed to get cached messages: %w", err)
@@ -115,7 +114,7 @@ func (s *MessageCacheService) GetCachedMessages(ctx context.Context, conversatio
 // InvalidateConversationCache removes cached messages for a conversation
 func (s *MessageCacheService) InvalidateConversationCache(ctx context.Context, conversationID uuid.UUID) error {
 	key := fmt.Sprintf(keyConversationMessages, conversationID.String())
-	return s.redis.Del(ctx, key).Err()
+	return s.provider.Delete(ctx, key)
 }
 
 // PrependMessage adds a new message to the cache
@@ -128,13 +127,13 @@ func (s *MessageCacheService) PrependMessage(ctx context.Context, message *model
 	}
 
 	// Add to beginning of list
-	s.redis.LPush(ctx, key, msgJSON)
+	s.provider.LPush(ctx, key, string(msgJSON))
 
 	// Keep only last 20
-	s.redis.LTrim(ctx, key, 0, 19)
+	s.provider.LTrim(ctx, key, 0, 19)
 
 	// Refresh expiry
-	s.redis.Expire(ctx, key, 1*time.Hour)
+	s.provider.Expire(ctx, key, 1*time.Hour)
 
 	return nil
 }
@@ -153,16 +152,16 @@ func (s *MessageCacheService) CacheConversations(ctx context.Context, userID uui
 	}
 
 	// Cache for 5 minutes
-	return s.redis.Set(ctx, key, data, 5*time.Minute).Err()
+	return s.provider.Set(ctx, key, string(data), 5*time.Minute)
 }
 
 // GetCachedConversations retrieves cached conversation list
 func (s *MessageCacheService) GetCachedConversations(ctx context.Context, userID uuid.UUID) ([]*models.Conversation, error) {
 	key := fmt.Sprintf(keyUserConversations, userID.String())
 
-	data, err := s.redis.Get(ctx, key).Result()
+	data, err := s.provider.Get(ctx, key)
 	if err != nil {
-		if err == redis.Nil {
+		if IsCacheMiss(err) {
 			return nil, nil // Cache miss
 		}
 		return nil, fmt.Errorf("failed to get cached conversations: %w", err)
@@ -179,7 +178,7 @@ func (s *MessageCacheService) GetCachedConversations(ctx context.Context, userID
 // InvalidateUserConversations removes cached conversation list
 func (s *MessageCacheService) InvalidateUserConversations(ctx context.Context, userID uuid.UUID) error {
 	key := fmt.Sprintf(keyUserConversations, userID.String())
-	return s.redis.Del(ctx, key).Err()
+	return s.provider.Delete(ctx, key)
 }
 
 // ============================================
@@ -191,36 +190,36 @@ func (s *MessageCacheService) SetUserOnline(ctx context.Context, userID uuid.UUI
 	key := fmt.Sprintf(keyUserPresence, userID.String())
 
 	// Set online status with 90s TTL (auto-expire if not refreshed)
-	err := s.redis.HSet(ctx, key, map[string]interface{}{
+	err := s.provider.HSet(ctx, key, map[string]string{
 		"is_online": "true",
-		"last_seen": time.Now().Unix(),
-	}).Err()
+		"last_seen": fmt.Sprintf("%d", time.Now().Unix()),
+	})
 
 	if err != nil {
 		return err
 	}
 
 	// Set TTL
-	return s.redis.Expire(ctx, key, 90*time.Second).Err()
+	return s.provider.Expire(ctx, key, 90*time.Second)
 }
 
 // SetUserOffline marks a user as offline
 func (s *MessageCacheService) SetUserOffline(ctx context.Context, userID uuid.UUID) error {
 	key := fmt.Sprintf(keyUserPresence, userID.String())
 
-	return s.redis.HSet(ctx, key, map[string]interface{}{
+	return s.provider.HSet(ctx, key, map[string]string{
 		"is_online": "false",
-		"last_seen": time.Now().Unix(),
-	}).Err()
+		"last_seen": fmt.Sprintf("%d", time.Now().Unix()),
+	})
 }
 
 // GetUserPresence retrieves a user's presence status
 func (s *MessageCacheService) GetUserPresence(ctx context.Context, userID uuid.UUID) (isOnline bool, lastSeen time.Time, err error) {
 	key := fmt.Sprintf(keyUserPresence, userID.String())
 
-	result, err := s.redis.HGetAll(ctx, key).Result()
+	result, err := s.provider.HGetAll(ctx, key)
 	if err != nil {
-		if err == redis.Nil {
+		if IsCacheMiss(err) {
 			return false, time.Time{}, nil
 		}
 		return false, time.Time{}, err
@@ -245,21 +244,11 @@ func (s *MessageCacheService) GetUserPresence(ctx context.Context, userID uuid.U
 func (s *MessageCacheService) GetMultiplePresence(ctx context.Context, userIDs []uuid.UUID) (map[uuid.UUID]*models.PresenceInfo, error) {
 	result := make(map[uuid.UUID]*models.PresenceInfo)
 
-	// Use pipeline for efficiency
-	pipe := s.redis.Pipeline()
-	cmds := make(map[uuid.UUID]*redis.StringStringMapCmd)
-
+	// Since we are using an abstraction, we'll do sequential HGetAll for now
+	// Alternatively, we could add Batch methods to CacheProvider
 	for _, userID := range userIDs {
 		key := fmt.Sprintf(keyUserPresence, userID.String())
-		cmds[userID] = pipe.HGetAll(ctx, key)
-	}
-
-	if _, err := pipe.Exec(ctx); err != nil && err != redis.Nil {
-		return nil, err
-	}
-
-	for userID, cmd := range cmds {
-		data, err := cmd.Result()
+		data, err := s.provider.HGetAll(ctx, key)
 		if err != nil || len(data) == 0 {
 			result[userID] = &models.PresenceInfo{
 				UserID:   userID,
@@ -297,13 +286,13 @@ func (s *MessageCacheService) SetTyping(ctx context.Context, conversationID, use
 	key := fmt.Sprintf(keyTyping, conversationID.String(), userID.String())
 
 	// Set with 3s TTL (auto-expire if not refreshed)
-	return s.redis.Set(ctx, key, "1", 3*time.Second).Err()
+	return s.provider.Set(ctx, key, "1", 3*time.Second)
 }
 
 // ClearTyping removes typing indicator for a user
 func (s *MessageCacheService) ClearTyping(ctx context.Context, conversationID, userID uuid.UUID) error {
 	key := fmt.Sprintf(keyTyping, conversationID.String(), userID.String())
-	return s.redis.Del(ctx, key).Err()
+	return s.provider.Delete(ctx, key)
 }
 
 // GetTypingUsers returns list of users currently typing in a conversation
@@ -311,23 +300,9 @@ func (s *MessageCacheService) GetTypingUsers(ctx context.Context, conversationID
 	// Scan for all typing keys for this conversation
 	pattern := fmt.Sprintf(keyTyping, conversationID.String(), "*")
 
-	var cursor uint64
-	var keys []string
-
-	for {
-		var err error
-		var batch []string
-
-		batch, cursor, err = s.redis.Scan(ctx, cursor, pattern, 10).Result()
-		if err != nil {
-			return nil, err
-		}
-
-		keys = append(keys, batch...)
-
-		if cursor == 0 {
-			break
-		}
+	keys, _, err := s.provider.Scan(ctx, 0, pattern, 100)
+	if err != nil {
+		return nil, err
 	}
 
 	// Extract user IDs from keys
@@ -353,23 +328,24 @@ func (s *MessageCacheService) GetTypingUsers(ctx context.Context, conversationID
 func (s *MessageCacheService) IncrementUnread(ctx context.Context, conversationID, userID uuid.UUID) error {
 	key := fmt.Sprintf(keyUnreadCounts, userID.String())
 
-	return s.redis.HIncrBy(ctx, key, conversationID.String(), 1).Err()
+	_, err := s.provider.HIncrBy(ctx, key, conversationID.String(), 1)
+	return err
 }
 
 // ResetUnread resets unread count for a conversation
 func (s *MessageCacheService) ResetUnread(ctx context.Context, conversationID, userID uuid.UUID) error {
 	key := fmt.Sprintf(keyUnreadCounts, userID.String())
 
-	return s.redis.HDel(ctx, key, conversationID.String()).Err()
+	return s.provider.HDel(ctx, key, conversationID.String())
 }
 
 // GetUnreadCounts retrieves all unread counts for a user
 func (s *MessageCacheService) GetUnreadCounts(ctx context.Context, userID uuid.UUID) (map[uuid.UUID]int, error) {
 	key := fmt.Sprintf(keyUnreadCounts, userID.String())
 
-	result, err := s.redis.HGetAll(ctx, key).Result()
+	result, err := s.provider.HGetAll(ctx, key)
 	if err != nil {
-		if err == redis.Nil {
+		if IsCacheMiss(err) {
 			return make(map[uuid.UUID]int), nil
 		}
 		return nil, err

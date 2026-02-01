@@ -1,4 +1,5 @@
 import 'dart:ui';
+import '../../../../core/utils/app_logger.dart';
 import 'dart:math' as math;
 import 'dart:async';
 import 'dart:convert';
@@ -108,14 +109,14 @@ class _ChatScreenState extends State<ChatScreen> {
           repliedToMessage = _messages.firstWhere(
             (m) => m.id == msg.replyToId,
           );
-          print('[ChatScreen] Found replied-to message for ${msg.id}: replyToId=${msg.replyToId}, found=${repliedToMessage.id}');
+          AppLogger.debug('[ChatScreen] Found replied-to message for ${msg.id}: replyToId=${msg.replyToId}, found=${repliedToMessage.id}');
         } catch (e) {
           // Message not found - might be from another conversation or not loaded yet
-          print('[ChatScreen] Replied-to message not found for ${msg.id}: replyToId=${msg.replyToId}, error=$e');
+          AppLogger.debug('[ChatScreen] Replied-to message not found for ${msg.id}: replyToId=${msg.replyToId}, error=$e');
           repliedToMessage = null;
         }
       } else {
-        print('[ChatScreen] Message ${msg.id} has no replyToId');
+        AppLogger.debug('[ChatScreen] Message ${msg.id} has no replyToId');
       }
       
       return {
@@ -305,12 +306,12 @@ class _ChatScreenState extends State<ChatScreen> {
       _deletedMessageIds = await _deletedMessagesService.getDeletedMessageIds(_conversationId!);
       _deletedForEveryoneIds = await _deletedMessagesService.getDeletedForEveryoneIds(_conversationId!);
       
-      print('[ChatScreen] Loaded deleted message IDs - For Me: ${_deletedMessageIds.length}, For Everyone: ${_deletedForEveryoneIds.length}');
+      AppLogger.debug('[ChatScreen] Loaded deleted message IDs - For Me: ${_deletedMessageIds.length}, For Everyone: ${_deletedForEveryoneIds.length}');
       
       final response = await _messagesService.getMessages(_conversationId!);
       
       if (response.success && response.data != null) {
-        print('[ChatScreen] Loaded ${response.data!.length} messages from API');
+        AppLogger.debug('[ChatScreen] Loaded ${response.data!.length} messages from API');
         
         // Extract reactions from messages by making a direct API call
         // The backend includes reactions in the message response
@@ -321,7 +322,7 @@ class _ChatScreenState extends State<ChatScreen> {
         
         // Filter out locally deleted messages (Delete for Me) and mark deleted for everyone
         final filteredMessages = reversedMessages.map((msg) {
-          print('[ChatScreen] Processing message ${msg.id}, type: ${msg.messageType}, attachmentUrl: ${msg.attachmentUrl}, attachmentName: ${msg.attachmentName}');
+          AppLogger.debug('[ChatScreen] Processing message ${msg.id}, type: ${msg.messageType}, attachmentUrl: ${msg.attachmentUrl}, attachmentName: ${msg.attachmentName}');
           // Filter out "Delete for Me" messages
           if (_deletedMessageIds.contains(msg.id)) {
             return null;
@@ -367,7 +368,7 @@ class _ChatScreenState extends State<ChatScreen> {
         // Set messages immediately (show encrypted content if needed)
         // Sort messages by timestamp (oldest to newest, so newest appear at bottom like WhatsApp)
         filteredMessages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
-        print('[ChatScreen] Setting ${filteredMessages.length} filtered messages to state');
+        AppLogger.debug('[ChatScreen] Setting ${filteredMessages.length} filtered messages to state');
         setState(() {
           _messages = filteredMessages;
           _isLoading = false;
@@ -435,7 +436,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   setState(() {
                     _messageReactions[messageId] = messageReactions;
                   });
-                  print('[ChatScreen] Loaded reactions for message $messageId: $messageReactions');
+                  AppLogger.debug('[ChatScreen] Loaded reactions for message $messageId: $messageReactions');
                 }
               }
             }
@@ -443,13 +444,13 @@ class _ChatScreenState extends State<ChatScreen> {
         }
       }
     } catch (e) {
-      print('[ChatScreen] Failed to load reactions: $e');
+      AppLogger.debug('[ChatScreen] Failed to load reactions: $e');
     }
   }
 
   /// Decrypt messages in background without blocking UI
   Future<void> _decryptMessagesInBackground(List<Message> messages) async {
-    print('[ChatScreen] Decrypting ${messages.length} messages in background');
+    AppLogger.debug('[ChatScreen] Decrypting ${messages.length} messages in background');
     // Decrypt messages that need decryption
     final decryptedResults = await Future.wait(
       messages.map((msg) async {
@@ -464,7 +465,7 @@ class _ChatScreenState extends State<ChatScreen> {
           );
           return MapEntry(msg.id, decrypted);
         } catch (e) {
-          print('[ChatScreen] Decryption failed for ${msg.id}: $e');
+          AppLogger.debug('[ChatScreen] Decryption failed for ${msg.id}: $e');
           return MapEntry(msg.id, 'Encrypted message');
         }
       }),
@@ -527,7 +528,7 @@ class _ChatScreenState extends State<ChatScreen> {
           attachmentType: message.attachmentType,
         );
       } catch (e) {
-        print('[ChatScreen] Decryption error: $e');
+        AppLogger.debug('[ChatScreen] Decryption error: $e');
         // Return original message if decryption fails, but still check deleted state
         if (isDeletedForEveryone) {
           return Message(
@@ -611,11 +612,11 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _handleWebSocketMessage(WSMessageEnvelope envelope) {
-    print('[ChatScreen] Received WebSocket message: type=${envelope.type}, channel=${envelope.channel}, conversationId=${envelope.conversationId}');
+    AppLogger.debug('[ChatScreen] Received WebSocket message: type=${envelope.type}, channel=${envelope.channel}, conversationId=${envelope.conversationId}');
     
     // Only handle messages for this conversation
     if (envelope.conversationId != _conversationId) {
-      print('[ChatScreen] Ignoring message for different conversation: ${envelope.conversationId}');
+      AppLogger.debug('[ChatScreen] Ignoring message for different conversation: ${envelope.conversationId}');
       return;
     }
     
@@ -644,16 +645,16 @@ class _ChatScreenState extends State<ChatScreen> {
       case 'typing':
       case 'stop_typing':
         // Typing indicators - can be implemented later
-        print('[ChatScreen] Typing indicator: ${envelope.type}');
+        AppLogger.debug('[ChatScreen] Typing indicator: ${envelope.type}');
         break;
       default:
-        print('[ChatScreen] Unhandled WebSocket message type: ${envelope.type}');
+        AppLogger.debug('[ChatScreen] Unhandled WebSocket message type: ${envelope.type}');
     }
   }
   
   void _handleNewMessage(WSMessageEnvelope envelope) {
     if (envelope.data == null) {
-      print('[ChatScreen] New message envelope has no data');
+      AppLogger.debug('[ChatScreen] New message envelope has no data');
       return;
     }
     
@@ -668,7 +669,7 @@ class _ChatScreenState extends State<ChatScreen> {
         final message = Message.fromJson(messageData);
       final isMyMessage = message.senderId == _currentUserId;
       
-      print('[ChatScreen] WebSocket new_message: id=${message.id}, replyToId=${message.replyToId}, isMyMessage=$isMyMessage');
+      AppLogger.debug('[ChatScreen] WebSocket new_message: id=${message.id}, replyToId=${message.replyToId}, isMyMessage=$isMyMessage');
       
       // Send ACK to backend
       _wsService.sendAck(envelope.id);
@@ -678,13 +679,13 @@ class _ChatScreenState extends State<ChatScreen> {
           if (mounted) {
             // Skip if message is in deleted list (Delete for Me)
             if (_deletedMessageIds.contains(decryptedMessage.id)) {
-              print('[ChatScreen] Skipping deleted message (for me): ${decryptedMessage.id}');
+              AppLogger.debug('[ChatScreen] Skipping deleted message (for me): ${decryptedMessage.id}');
               return;
             }
             
             // Mark as deleted if in "Delete for Everyone" list
             if (_deletedForEveryoneIds.contains(decryptedMessage.id)) {
-              print('[ChatScreen] Marking WebSocket message as deleted (for everyone): ${decryptedMessage.id}');
+              AppLogger.debug('[ChatScreen] Marking WebSocket message as deleted (for everyone): ${decryptedMessage.id}');
               decryptedMessage = Message(
                 id: decryptedMessage.id,
                 conversationId: decryptedMessage.conversationId,
@@ -770,24 +771,24 @@ class _ChatScreenState extends State<ChatScreen> {
                           );
                     _messages[pendingIndex] = finalMessage;
                 _pendingMessages.remove(pendingEntry.key);
-                    print('[ChatScreen] Replaced pending message: ${pendingEntry.key}, replyToId: ${finalMessage.replyToId}');
+                    AppLogger.debug('[ChatScreen] Replaced pending message: ${pendingEntry.key}, replyToId: ${finalMessage.replyToId}');
                   } else {
                     // Pending message not found, add new one
                     _messages.add(decryptedMessage);
                     _messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
-                    print('[ChatScreen] Added new message (pending not found): ${decryptedMessage.id}');
+                    AppLogger.debug('[ChatScreen] Added new message (pending not found): ${decryptedMessage.id}');
                   }
                 } else {
                   // No pending message, add new one
                   _messages.add(decryptedMessage);
                   _messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
-                  print('[ChatScreen] Added new message: ${decryptedMessage.id}');
+                  AppLogger.debug('[ChatScreen] Added new message: ${decryptedMessage.id}');
                 }
               } else {
                 // Not my message, just add it
                 _messages.add(decryptedMessage);
                 _messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
-                print('[ChatScreen] Added new message from other user: ${decryptedMessage.id}');
+                AppLogger.debug('[ChatScreen] Added new message from other user: ${decryptedMessage.id}');
               }
             } else {
               // Update existing message (optimistic update replacement)
@@ -824,7 +825,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       attachmentType: decryptedMessage.attachmentType ?? existingMsg.attachmentType,
                     );
               _messages[existingIndex] = finalMessage;
-              print('[ChatScreen] Updated existing message: ${decryptedMessage.id}, replyToId: ${finalMessage.replyToId}');
+              AppLogger.debug('[ChatScreen] Updated existing message: ${decryptedMessage.id}, replyToId: ${finalMessage.replyToId}');
             }
           });
           
@@ -835,8 +836,8 @@ class _ChatScreenState extends State<ChatScreen> {
             }
       });
     } catch (e) {
-      print('[ChatScreen] Error handling new message: $e');
-      print('[ChatScreen] Message data: ${envelope.data}');
+      AppLogger.debug('[ChatScreen] Error handling new message: $e');
+      AppLogger.debug('[ChatScreen] Message data: ${envelope.data}');
     }
   }
   
@@ -873,7 +874,7 @@ class _ChatScreenState extends State<ChatScreen> {
         });
       }
       } catch (e) {
-      print('[ChatScreen] Error handling message read: $e');
+      AppLogger.debug('[ChatScreen] Error handling message read: $e');
     }
   }
   
@@ -908,7 +909,7 @@ class _ChatScreenState extends State<ChatScreen> {
         });
       }
     } catch (e) {
-      print('[ChatScreen] Error handling message delivered: $e');
+      AppLogger.debug('[ChatScreen] Error handling message delivered: $e');
       }
   }
   
@@ -936,13 +937,13 @@ class _ChatScreenState extends State<ChatScreen> {
             _messages[index] = decryptedMessage;
           });
           
-          print('[ChatScreen] Message edited: $messageId');
+          AppLogger.debug('[ChatScreen] Message edited: $messageId');
         } else {
-          print('[ChatScreen] Edited message not found in list: $messageId');
+          AppLogger.debug('[ChatScreen] Edited message not found in list: $messageId');
         }
       }
     } catch (e) {
-      print('[ChatScreen] Error handling message edited: $e');
+      AppLogger.debug('[ChatScreen] Error handling message edited: $e');
     }
   }
   
@@ -1002,10 +1003,10 @@ class _ChatScreenState extends State<ChatScreen> {
             }
           }
         }
-        print('[ChatScreen] Message deleted: $messageId (for: $deleteFor)');
+        AppLogger.debug('[ChatScreen] Message deleted: $messageId (for: $deleteFor)');
       }
     } catch (e) {
-      print('[ChatScreen] Error handling message deleted: $e');
+      AppLogger.debug('[ChatScreen] Error handling message deleted: $e');
     }
   }
 
@@ -1237,7 +1238,7 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       await _audioService.cancelRecording();
     } catch (e) {
-      print('[ChatScreen] Error canceling recording: $e');
+      AppLogger.debug('[ChatScreen] Error canceling recording: $e');
     } finally {
       setState(() {
         _isRecordingAudio = false;
@@ -1279,7 +1280,7 @@ class _ChatScreenState extends State<ChatScreen> {
         durationSeconds = duration.inSeconds;
       }
     } catch (e) {
-      print('[ChatScreen] Error getting audio duration: $e');
+      AppLogger.debug('[ChatScreen] Error getting audio duration: $e');
     }
 
     // Create optimistic message
@@ -1584,7 +1585,7 @@ class _ChatScreenState extends State<ChatScreen> {
         replyToId: replyToId,
       );
       
-      print('[ChatScreen] Created optimistic message: tempId=$tempId, replyToId=$replyToId');
+      AppLogger.debug('[ChatScreen] Created optimistic message: tempId=$tempId, replyToId=$replyToId');
       
       // Store mapping for later replacement
       _pendingMessages[tempId] = optimisticMessage;
@@ -1648,7 +1649,7 @@ class _ChatScreenState extends State<ChatScreen> {
             );
             _messages[index] = finalMessage;
             _messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
-            print('[ChatScreen] Replaced optimistic message, replyToId: ${finalMessage.replyToId}');
+            AppLogger.debug('[ChatScreen] Replaced optimistic message, replyToId: ${finalMessage.replyToId}');
           } else {
             // Optimistic message not found (might have been replaced by WebSocket)
             // Check if message already exists
@@ -1803,7 +1804,7 @@ class _ChatScreenState extends State<ChatScreen> {
         });
       }
     } catch (e) {
-      print('[ChatScreen] Failed to add reaction: $e');
+      AppLogger.debug('[ChatScreen] Failed to add reaction: $e');
     }
   }
 
@@ -1825,7 +1826,7 @@ class _ChatScreenState extends State<ChatScreen> {
         });
       }
     } catch (e) {
-      print('[ChatScreen] Error handling message reaction: $e');
+      AppLogger.debug('[ChatScreen] Error handling message reaction: $e');
     }
   }
 
@@ -1848,7 +1849,7 @@ class _ChatScreenState extends State<ChatScreen> {
         });
       }
     } catch (e) {
-      print('[ChatScreen] Error handling message reaction removed: $e');
+      AppLogger.debug('[ChatScreen] Error handling message reaction removed: $e');
     }
   }
 
@@ -2475,11 +2476,11 @@ class _ChatScreenState extends State<ChatScreen> {
           for (final conversationId in conversationIds) {
             // Skip forwarding to the same conversation
             if (conversationId == _conversationId) {
-              print('[ChatScreen] Skipping forwarding to same conversation: $conversationId');
+              AppLogger.debug('[ChatScreen] Skipping forwarding to same conversation: $conversationId');
               continue;
             }
             
-            print('[ChatScreen] Forwarding message $messageId to conversation $conversationId');
+            AppLogger.debug('[ChatScreen] Forwarding message $messageId to conversation $conversationId');
             final response = await _messagesService.forwardMessage(
               messageId,
               conversationId,
@@ -2487,18 +2488,18 @@ class _ChatScreenState extends State<ChatScreen> {
             
             if (response.success) {
               successCount++;
-              print('[ChatScreen] Successfully forwarded message $messageId to $conversationId');
+              AppLogger.debug('[ChatScreen] Successfully forwarded message $messageId to $conversationId');
             } else {
               failCount++;
               final error = response.error ?? 'Unknown error';
               errors.add(error);
-              print('[ChatScreen] Failed to forward message $messageId to $conversationId: $error');
+              AppLogger.debug('[ChatScreen] Failed to forward message $messageId to $conversationId: $error');
             }
           }
         } catch (e) {
           failCount++;
           errors.add('Failed to forward message: ${e.toString()}');
-          print('[ChatScreen] Error forwarding message $messageId: $e');
+          AppLogger.debug('[ChatScreen] Error forwarding message $messageId: $e');
         }
       }
 
@@ -2539,7 +2540,7 @@ class _ChatScreenState extends State<ChatScreen> {
         }
       }
     } catch (e) {
-      print('[ChatScreen] Error forwarding messages: $e');
+      AppLogger.debug('[ChatScreen] Error forwarding messages: $e');
       if (mounted) {
         setState(() {
           _isSending = false;
@@ -2858,7 +2859,7 @@ class _ChatScreenState extends State<ChatScreen> {
         }
       }
     } catch (e) {
-      print('[ChatScreen] Error deleting message: $e');
+      AppLogger.debug('[ChatScreen] Error deleting message: $e');
       
       // If API fails but user selected "Delete for Everyone", update optimistically and persist
       if (deleteOption == 'everyone' && mounted) {
